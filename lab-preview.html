@@ -7,11 +7,11 @@
 <style>
 :root{color-scheme:dark}body{margin:0;padding:1rem;background:#101d2b;color:#e5f8fb;font:16px system-ui}
 h1{font-size:1.25rem}h2{font-size:1rem}article{border:1px solid #527080;border-radius:.75rem;padding:.8rem;margin:.7rem 0}
-button{color:#10242d;background:#9aeee2;border:0;border-radius:.4rem;padding:.5rem .8rem;font:inherit}
+button{color:#10242d;background:#9aeee2;border:0;border-radius:.4rem;padding:.5rem .8rem;font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #fff;outline-offset:2px}.toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin:1rem 0}.toolbar button{background:#294c5b;color:#e9ffff;border:1px solid #6da9ac}.toolbar button[aria-pressed=true]{background:#9aeee2;color:#10242d}.stats{display:flex;gap:1rem;flex-wrap:wrap;color:#9aeee2;font-size:.85rem}.card-tools{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}.mini{padding:.55rem;background:#152f3f;border-radius:.5rem;margin-top:.6rem}.mini input{max-width:100%;padding:.5rem;background:#0b1a29;border:1px solid #6b919b;color:#fff;border-radius:.4rem}.meter{height:10px;border-radius:8px;background:#314b57;overflow:hidden;margin-top:.7rem}.meter span{display:block;height:100%;background:#9aeee2;transition:width .2s}.history{font-size:.8rem;color:#a4d7da}
 output{display:block;margin-top:.5rem;white-space:pre-wrap}a{color:#9aeee2}
 </style>
 <main>
-<h1>FormLab 실험 미리보기</h1>
+<h1>🧪 FormLab · 실험 관제실 v2</h1><p>안전한 예제 데이터로 실험해 보세요. Firebase에 쓰지 않습니다.</p><div class="stats"><strong id="active-count">활성 모듈 0개</strong><span id="lab-clock">로컬 실험 환경</span></div><div class="toolbar"><button id="demo-all" type="button">전체 데모 ON</button><button id="demo-off" type="button">전체 OFF</button><button id="demo-reset" type="button">실험 기록 초기화</button></div><p class="history" id="lab-history" aria-live="polite">기록 없음</p>
 <p id="empty">BETA LAB에서 스위치를 켜면 이곳에 체험용 모듈이 표시돼요.</p>
 <section id="modules" aria-label="활성 실험"></section>
 </main>
@@ -29,12 +29,18 @@ const modules = {
 };
 const root = document.getElementById('modules');
 const active = new Map();
+let actions=0;
+const history=[];
+function log(message){actions++;history.unshift(message);history.length=Math.min(history.length,5);document.getElementById('lab-history').textContent='체험 '+actions+'회 · '+history.join(' / ');}
+function updateCount(){document.getElementById('active-count').textContent='활성 모듈 '+active.size+' / '+Object.keys(modules).length+'개';}
 function addModule(id) {
   const [name, action, samples] = modules[id];
   const card = document.createElement('article');
   const heading = document.createElement('h2');
   const button = document.createElement('button');
   const output = document.createElement('output');
+  const tools = document.createElement('div');tools.className='card-tools';
+  const details = document.createElement('div');details.className='mini';
   let step = 0;
   heading.textContent = name;
   button.textContent = action;
@@ -43,9 +49,16 @@ function addModule(id) {
   button.addEventListener('click', () => {
     const index = step++ % samples.length;
     output.textContent = samples[index];
+    log(name+' 체험');
     if (id === 'theme-engine') card.style.backgroundColor = ['#263e58', '#513369', '#242334'][index];
   });
-  card.append(heading, button, output);
+  const secondary=document.createElement('button');secondary.type='button';secondary.textContent='실험 리셋';secondary.addEventListener('click',()=>{step=0;output.textContent='초기화 완료';details.replaceChildren();card.style.backgroundColor='';log(name+' 초기화');});
+  tools.append(button,secondary);
+  if(id==='live-analytics'){const meter=document.createElement('div');meter.className='meter';const bar=document.createElement('span');bar.style.width='0%';meter.append(bar);details.append(meter);button.addEventListener('click',()=>{bar.style.width=(Math.min(step*25,100))+'%';});}
+  if(id==='rapid-next'){const balance=document.createElement('strong');balance.textContent='모의 잔액 e100';details.append(balance);button.addEventListener('click',()=>{balance.textContent='모의 잔액 e'+Math.max(0,100-step*10);});secondary.addEventListener('click',()=>{balance.textContent='모의 잔액 e100';});}
+  if(id==='secret-lab'){const input=document.createElement('input');input.placeholder='ROT-3 결과 입력';input.setAttribute('aria-label','암호 해독 답');const check=document.createElement('button');check.type='button';check.textContent='정답 확인';check.addEventListener('click',()=>{output.textContent=input.value.trim().toUpperCase()==='FORMWHEEL'?'정답! 실험 성공':'다시 도전!';log('암호 해독 확인');});details.append(input,check);}
+  if(id==='fw12-experimental'){const input=document.createElement('input');input.placeholder='예제 오류 메시지 입력';input.setAttribute('aria-label','진단할 예제 오류');const check=document.createElement('button');check.type='button';check.textContent='문자열 진단';check.addEventListener('click',()=>{const v=input.value.toLowerCase();output.textContent=v.includes('permission_denied')?'권한 규칙 점검 권장':v.includes('syntaxerror')?'JavaScript 문법 확인 권장':'알려진 예제 오류와 일치하지 않음';log('FW12 예제 진단');});details.append(input,check);}
+  card.append(heading,tools,output,details);
   root.append(card);
   active.set(id, card);
 }
@@ -59,6 +72,7 @@ function applyEnabled(ids) {
     }
   }
   document.getElementById('empty').hidden = active.size > 0;
+  updateCount();
 }
 function readHash() {
   const value = new URLSearchParams(location.hash.slice(1)).get('enabled') || '';
@@ -70,6 +84,9 @@ window.addEventListener('message', event => {
       event.data?.type !== 'formwheel-beta-preview' || !Array.isArray(event.data.enabled)) return;
   applyEnabled(event.data.enabled);
 });
+document.getElementById('demo-all').addEventListener('click',()=>{applyEnabled(Object.keys(modules));log('전체 데모 ON');});
+document.getElementById('demo-off').addEventListener('click',()=>{applyEnabled([]);log('전체 OFF');});
+document.getElementById('demo-reset').addEventListener('click',()=>{actions=0;history.length=0;document.getElementById('lab-history').textContent='기록 없음';applyEnabled([]);});
 readHash();
 </script>
 </html>
