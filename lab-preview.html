@@ -49,10 +49,8 @@ function addModule(id) {
   root.append(card);
   active.set(id, card);
 }
-window.addEventListener('message', event => {
-  if (event.source !== window.parent || event.origin !== 'https://semicolonxss.github.io' ||
-      event.data?.type !== 'formwheel-beta-preview' || !Array.isArray(event.data.enabled)) return;
-  const enabled = new Set(event.data.enabled);
+function applyEnabled(ids) {
+  const enabled = new Set(ids.filter(id => Object.hasOwn(modules,id)));
   for (const id of Object.keys(modules)) {
     if (enabled.has(id) && !active.has(id)) addModule(id);
     if (!enabled.has(id) && active.has(id)) {
@@ -61,6 +59,17 @@ window.addEventListener('message', event => {
     }
   }
   document.getElementById('empty').hidden = active.size > 0;
+}
+function readHash() {
+  const value = new URLSearchParams(location.hash.slice(1)).get('enabled') || '';
+  applyEnabled(value.split(',').filter(Boolean));
+}
+window.addEventListener('hashchange',readHash);
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.origin !== 'https://semicolonxss.github.io' ||
+      event.data?.type !== 'formwheel-beta-preview' || !Array.isArray(event.data.enabled)) return;
+  applyEnabled(event.data.enabled);
 });
+readHash();
 </script>
 </html>
