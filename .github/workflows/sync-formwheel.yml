@@ -17,13 +17,13 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' --exclude='firebase-security' --exclude='.env' --exclude='.env.*' /tmp/formwheel-upstream/ /tmp/formlab-snapshot/
       - name: Copy source while preserving lab controls
         run: |
-          rsync -a --delete --exclude='.git' --exclude='.github' --exclude='README.md' --exclude='FORMLAB-SAFETY.md' --exclude='formlab-bootstrap.js' /tmp/formlab-snapshot/ ./
+          rsync -a --delete --exclude='.git' --exclude='.github' --exclude='README.md' --exclude='FORMLAB-SAFETY.md' --exclude='formlab-bootstrap.js' --exclude='lab-preview.html' /tmp/formlab-snapshot/ ./
           python3 - <<'PY'
           from pathlib import Path
           # A lab copy must not accidentally access production Firebase.
           # Disable the original application entry points until isolated credentials are supplied.
           for page in Path('.').rglob('*.html'):
-              if '.git' in page.parts: continue
+              if '.git' in page.parts or page == Path('lab-preview.html'): continue
               text=page.read_text(encoding='utf-8',errors='replace')
               banner='<div style="position:fixed;inset:0;z-index:2147483647;background:#081523;color:#dff;padding:8vh 7vw;font:18px system-ui"><h1>🧪 FormLab 안전 대기 모드</h1><p>Formwheel 소스 복제 완료. 독립 Firebase 환경이 연결되기 전까지 실행을 차단합니다.</p><a style="color:#8ef" href="https://semicolonxss.github.io/Formwheel/beta-lab.html">BETA LAB 제어실</a></div>'
               # Place blocking cover before scripts and prevent their execution.
