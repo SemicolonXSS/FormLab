@@ -83,7 +83,23 @@ window.addEventListener('message', event => {
   if (event.source !== window.parent || event.origin !== 'https://semicolonxss.github.io' ||
       event.data?.type !== 'formwheel-beta-preview' || !Array.isArray(event.data.enabled)) return;
   applyEnabled(event.data.enabled);
+  window.parent.postMessage({type:'formlab-preview-applied',revision:event.data.revision,count:active.size},event.origin);
 });
+const channelId=new URLSearchParams(location.hash.slice(1)).get('channel');
+if(window.parent===window && typeof BroadcastChannel==='function' &&
+   /^[0-9a-f-]{36}$/.test(channelId||'')){
+  const channel=new BroadcastChannel('fw.betaLab.'+channelId);
+  channel.addEventListener('message',event=>{
+    if(event.data?.type==='formwheel-beta-preview' && Array.isArray(event.data.enabled)){
+      applyEnabled(event.data.enabled);
+      // Keep reloads and browser history consistent with the most recent selection.
+      const params=new URLSearchParams(location.hash.slice(1));
+      params.set('enabled',[...active.keys()].join(','));
+      window.history.replaceState(null,'','#'+params);
+    }
+  });
+  channel.postMessage({type:'formlab-preview-request'});
+}
 document.getElementById('demo-all').addEventListener('click',()=>{applyEnabled(Object.keys(modules));log('전체 데모 ON');});
 document.getElementById('demo-off').addEventListener('click',()=>{applyEnabled([]);log('전체 OFF');});
 document.getElementById('demo-reset').addEventListener('click',()=>{actions=0;history.length=0;document.getElementById('lab-history').textContent='기록 없음';applyEnabled([]);});
