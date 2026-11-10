@@ -1,0 +1,617 @@
+/* Formwheel Hub live presence. One user is counted once across multiple tabs. */
+import {initializeApp,getApps} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInAnonymously,getIdTokenResult} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {claimVisibleTime} from "../shared/visitor-time.js";
+import {getDatabase,ref,onValue,onDisconnect,set,remove,serverTimestamp,runTransaction} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+const config={apiKey:"AIzaSyBreTSe1m0-xlbF4aupnU5isRZCihR25IE",authDomain:"formwheel.firebaseapp.com",databaseURL:"https://formwheel-default-rtdb.firebaseio.com",projectId:"formwheel",storageBucket:"formwheel.firebasestorage.app",messagingSenderId:"431583088241",appId:"1:431583088241:web:74e0e34ea1e3e1170c55d0"};
+const app=getApps().find(x=>x.name==="[DEFAULT]")||initializeApp(config);
+const auth=getAuth(app),db=getDatabase(app);
+let canPublish=false,authGeneration=0;
+const label=document.getElementById("fw-live-count"),note=document.getElementById("fw-live-note");
+const base="formwheelV2/liveHubSessions";
+let latestSessions={};
+let latestVisitors={};
+const visitorBase="formwheelV2/visitorStats/uniqueVisitors";
+/* All-time peak of distinct active UIDs. Saved separately from visitor totals. */
+const peakPath="formwheelV2/visitorStats/livePeak";
+const peakLabel=document.getElementById("fw-live-peak");
+let recordedPeak=0,peakWritePending=false,peakCandidate=0,peakLoaded=false;
+const peakToastKey="fw-peak-toast";
+function showPeakToast(count){
+  if(!count||document.hidden)return;
+  let toast=document.getElementById(peakToastKey);
+  if(!toast){toast=document.createElement("div");toast.id=peakToastKey;toast.setAttribute("role","status");
+    toast.style.cssText="position:fixed;bottom:22px;left:50%;transform:translate(-50%,20px);z-index:10010;background:#292153;color:white;padding:13px 18px;border-radius:16px;font:700 14px/1.5 system-ui,sans-serif;box-shadow:0 10px 35px #19143155;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;text-align:center;max-width:90vw";
+    document.body.appendChild(toast);
+  }
+  toast.textContent="🏆 Formwheel 동시 접속 신기록! "+count+"명 🎉";
+  toast.style.opacity="1";toast.style.transform="translate(-50%,0)";
+  clearTimeout(showPeakToast.timer);
+  showPeakToast.timer=setTimeout(()=>{toast.style.opacity="0";toast.style.transform="translate(-50%,20px)"},4200);
+}
+function renderPeak(){if(peakLabel)peakLabel.textContent=peakLoaded?recordedPeak.toLocaleString("ko-KR")+"명":"확인 중…";}
+async function savePeak(){
+  if(!canPublish||peakWritePending||!peakLoaded||peakCandidate<=recordedPeak||!auth.currentUser)return;
+  peakWritePending=true;
+  try{
+    const result=await runTransaction(ref(db,peakPath),current=>{
+      const old=Math.max(0,Number(current?.count)||0);
+      if(peakCandidate<=old)return;
+      return {count:peakCandidate,recordedAt:Date.now()};
+    },{applyLocally:false});
+    if(result.committed){
+      const count=Math.max(0,Number(result.snapshot.val()?.count)||0);
+      if(count>recordedPeak){recordedPeak=count;renderPeak();showPeakToast(count);}
+    }
+  }catch(error){console.warn("동시 접속 최고 기록 저장 실패 (Firebase Rules 확인)",error.code||error)}
+  finally{peakWritePending=false;}
+}
+onValue(ref(db,peakPath),snap=>{
+  const count=Math.max(0,Number(snap.val()?.count)||0);
+  if(count>recordedPeak){recordedPeak=count;if(peakLoaded)showPeakToast(count);}
+  peakLoaded=true;renderPeak();
+  if(peakCandidate>recordedPeak)void savePeak();
+},error=>{if(peakLabel)peakLabel.textContent="조회 불가";console.warn("최고 동접 기록 읽기 실패",error.code||error)});
+
+const visitorCount=document.getElementById("fw-total-visitor-count");
+const visitorNote=document.getElementById("fw-total-visitor-note");
+let recordedVisitorUid=null;
+let visitorRetryTimer=null;
+let visitorRetryAttempts=0;
+let durationTimer=null;
+let durationBusy=false;
+let pendingDurationMs=0;
+let durationOwnerUid=null;
+let durationRetryAfter=0;
+const DURATION_INTERVAL=15000;
+let lastActiveTick=Date.now();
+const projectStatsKey='Hub';
+const DURATION_MAX_GAP=45000;
+const formatDuration=ms=>{
+ if(!Number.isFinite(ms)||ms<=0)return "0분";
+ const minutes=Math.floor(ms/60000),seconds=Math.floor(ms/1000)%60;
+ const hours=Math.floor(minutes/60),days=Math.floor(hours/24);
+ return (days?days+"일 ":"")+(hours%24?hours%24+"시간 ":"")+(minutes%60?minutes%60+"분":!days&&!hours?"0분":"")+(minutes<1?" "+seconds+"초":"");
+};
+async function accumulateDuration(uid,{allowHidden=false}={}){
+  if(!uid||auth.currentUser?.uid!==uid||recordedVisitorUid!==uid)return;
+  const now=Date.now();
+  const elapsed=Math.min(DURATION_MAX_GAP,Math.max(0,now-lastActiveTick));
+  lastActiveTick=now;
+  if(durationOwnerUid!==uid){durationOwnerUid=uid;pendingDurationMs=0;durationRetryAfter=0}
+  // Only foreground time counts. Visibility changes explicitly flush the last foreground slice.
+  if(allowHidden||document.visibilityState==="visible"){
+    const claimed=await claimVisibleTime(uid,elapsed,now);
+    if(durationOwnerUid!==uid||auth.currentUser?.uid!==uid)return;
+    pendingDurationMs=Math.min(5*60*1000,pendingDurationMs+claimed);
+  }
+  if(!connection||durationBusy||now<durationRetryAfter||pendingDurationMs<1000)return;
+  const batch=Math.floor(pendingDurationMs/1000)*1000;
+  pendingDurationMs-=batch;
+  durationBusy=true;
+  try{
+    const result=await runTransaction(ref(db,visitorBase+"/"+uid),current=>{
+      // Firebase may initially invoke a transaction with null before the server
+      // snapshot is available. Returning undefined here aborts it prematurely.
+      // Create a valid baseline only if the record is genuinely missing;
+      // Firebase retries the updater against the current server value.
+      const existing=current&&typeof current==="object"?current:null;
+      const baseline=existing||{
+        firstSeen:now,
+        accountType:auth.currentUser?.isAnonymous?"guest":"account",
+        totalMs:0,
+        projectMs:{},
+        visitCount:1,
+        lastCountedAt:now,
+        lastVisitAt:now,
+        firstAttribution:entryChannel
+      };
+      const projectMs={...(baseline.projectMs||{})};
+      projectMs[projectStatsKey]=(Number(projectMs[projectStatsKey])||0)+batch;
+      return {...baseline,totalMs:(Number(baseline.totalMs)||0)+batch,projectMs,
+        lastCountedAt:now,lastVisitAt:now};
+    },{applyLocally:false});
+    if(!result.committed)throw new Error("duration_transaction_not_committed");
+    durationRetryAfter=0;
+  }catch(error){
+    if(durationOwnerUid===uid){
+      pendingDurationMs=Math.min(5*60*1000,pendingDurationMs+batch);
+      durationRetryAfter=Date.now()+15000;
+    }
+    console.warn("방문 시간 누적 실패",error.code||error.message||error);
+  }finally{durationBusy=false}
+}
+function visitorEntries(){return Object.entries(latestVisitors).filter(([,v])=>v&&typeof v==="object");}
+let detailTotal=null,publicTotal=null,liveStatus="집계 확인 중…",totalStatus=liveStatus;
+let visitorDetailsReady=false,visitorDetailsError="";
+function renderTotal(){
+ const count=publicTotal??detailTotal;
+ if(visitorCount)visitorCount.textContent=count===null?totalStatus:count.toLocaleString("ko-KR")+"명";
+}
+let lastPublishedTotal=null,publicLiveAt=0;
+const countsReport={live:"대기",total:"대기"};
+function reportCount(key,message){
+ countsReport[key]=message;
+ const output=document.getElementById("fw-count-report");
+ if(output)output.textContent="접속자 · "+countsReport.live+" / 누적 · "+countsReport.total;
+}
+function publishCount(key,count){
+ if(!canPublish)return Promise.resolve();
+ const target=ref(db,"formwheelV2/publicVisitorCounts/"+key);
+ // Admin fallback must never replace a newer count with a stale browser snapshot.
+ const write=key==="total"
+  ?runTransaction(target,current=>{
+    const existing=Number(current?.count??current??0);
+    if(!Number.isSafeInteger(existing)||existing>=count)return;
+    return {count,updatedAt:Date.now()};
+   },{applyLocally:false})
+  :set(target,{count,updatedAt:serverTimestamp()});
+ return write.then(()=>reportCount(key,"저장 완료")).catch(error=>{
+  if(key==="total")lastPublishedTotal=null;else lastPublishedLive=null;
+  reportCount(key,"공개 숫자 저장 실패 ("+(error.code||error.message)+")");
+ });
+}
+// Only coarse, anonymized aggregates are eligible for public read.
+// Firebase Rules must authorize a trusted publisher and public read for this node.
+const analyticsPath="formwheelV2/publicVisitorCounts/analytics";
+let publicAnalytics=null,publicAnalyticsError="";
+function coarseAnalytics(){
+ const entries=visitorEntries();
+ const daily={},channels={};let repeat=0,engaged=0;
+ const kst=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"});
+ for(const [,v] of entries){
+  if(Number(v.visitCount)>1)repeat++;
+  if(Number(v.totalMs)>=60000)engaged++;
+  const t=Number(v.firstSeen);
+  if(Number.isFinite(t)&&t>0){const day=kst.format(new Date(t));daily[day]=(daily[day]||0)+1}
+  const channel=String(v.firstAttribution?.channel||"untracked").replace(/[^a-z0-9_-]/gi,"").slice(0,32);
+  channels[channel]=(channels[channel]||0)+1;
+ }
+ // Hide small segments to avoid exposing individual visit times or origins.
+ const grouped=values=>Object.fromEntries(Object.entries(values).filter(([,count])=>count>=5));
+ return {total:entries.length,returning:repeat>=5?repeat:null,engaged:engaged>=5?engaged:null,daily:grouped(daily),channels:grouped(channels),updatedAt:Date.now(),schema:1};
+}
+const watchVisitors=()=>onValue(ref(db,visitorBase),snapshot=>{
+ latestVisitors=snapshot.val()||{};visitorDetailsReady=true;visitorDetailsError="";
+ detailTotal=visitorEntries().length;
+ // Never replace a previously confirmed public count with an unexplained empty result.
+ const mismatch=detailTotal===0&&Number.isSafeInteger(publicTotal)&&publicTotal>0;
+ if(mismatch){visitorDetailsReady=false;visitorDetailsError="공개 집계와 상세 기록 불일치";detailTotal=null;}
+ renderTotal();
+ if(!mismatch&&detailTotal>0&&detailTotal!==lastPublishedTotal){lastPublishedTotal=detailTotal;publishCount("total",detailTotal)}
+ if(!mismatch&&detailTotal>=5){
+  // Never write individual records to the public location.
+  const aggregate=coarseAnalytics();
+  const previous=publicAnalytics;
+  if(!previous||aggregate.total!==previous.total||Date.now()-Number(previous.updatedAt||0)>3600000){
+   set(ref(db,analyticsPath),aggregate).catch(error=>{console.warn("익명 통계 게시 권한 필요",error.code||error.message)});
+  }
+ }
+ if(visitorNote)visitorNote.textContent="집계 시작 이후 · UID당 1명";
+ if(adminUnlocked)renderAdmin();
+},error=>{visitorDetailsReady=false;visitorDetailsError=error.code||"읽기 실패";if(adminUnlocked)renderAdmin();reportCount("total","원본 읽기 실패 ("+error.code+")");detailTotal=null;renderTotal();console.debug("방문 상세 조회",error.code)});
+function getEntryChannel(){
+ const q=new URLSearchParams(location.search);
+ const source=(q.get("utm_source")||"").toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,32);
+ let host="";try{host=new URL(document.referrer).hostname.toLowerCase()}catch{}
+ if(source)return {channel:source,method:"utm"};
+ if(!host||host==="semicolonxss.github.io")return {channel:"direct_or_unknown",method:"referrer"};
+ if(host.includes("blogspot."))return {channel:"blogger",method:"referrer"};
+ if(host.includes("google.")||host.includes("naver.")||host.includes("bing."))return {channel:"search",method:"referrer"};
+ if(host.includes("youtube.")||host==="youtu.be")return {channel:"youtube",method:"referrer"};
+ if(host.includes("threads."))return {channel:"threads",method:"referrer"};
+ if(host.includes("instagram."))return {channel:"instagram",method:"referrer"};
+ return {channel:"other_external",method:"referrer"};
+}
+const entryChannel=getEntryChannel();
+async function recordVisitor(user){
+ if(!user||recordedVisitorUid===user.uid)return;
+ const uid=user.uid,now=Date.now();
+ try{
+  const node=ref(db,visitorBase+"/"+uid);
+  const visitorResult=await runTransaction(node,current=>current===null?{
+   firstSeen:now,accountType:user.isAnonymous?"guest":"account",
+   totalMs:0,projectMs:{},visitCount:1,lastCountedAt:now,lastVisitAt:now,firstAttribution:entryChannel
+  }:current&&typeof current==="object"?{
+   ...current,totalMs:Number(current.totalMs)||0,
+   visitCount:(Number(current.visitCount)||1)+(now-(Number(current.lastVisitAt)||0)>30*60*1000?1:0),
+   lastCountedAt:now,lastVisitAt:now,
+   lastAttribution:entryChannel
+  }:undefined,{applyLocally:false});
+  if(!visitorResult.committed||!visitorResult.snapshot.exists())throw new Error("visitor_transaction_not_committed");
+  if(auth.currentUser?.uid!==uid)return;
+  recordedVisitorUid=uid;durationOwnerUid=uid;pendingDurationMs=0;durationRetryAfter=0;lastActiveTick=Date.now();
+  if(visitorRetryTimer){clearTimeout(visitorRetryTimer);visitorRetryTimer=null;}
+  visitorRetryAttempts=0;
+  if(user.isAnonymous&&visitorNote){
+   visitorNote.textContent="익명 방문 기록 저장됨 · 공개 누적 숫자는 서버 집계 후 자동 갱신";
+  }
+  if(durationTimer)clearInterval(durationTimer);
+  durationTimer=setInterval(()=>accumulateDuration(uid),DURATION_INTERVAL);
+ }catch(error){
+  const reason=error.code||error.message||"오류";
+  console.warn("Formwheel 방문 등록 실패",reason);
+  if(visitorNote)visitorNote.textContent="방문 기록 저장 실패 · 익명 로그인 및 Firebase Rules 확인 ("+reason+")";
+  // Retry transient network errors, but do not loop on Rules/auth denials.
+  const retryable=/network|unavailable|disconnected|timeout/i.test(String(reason));
+  if(retryable&&auth.currentUser?.uid===uid&&visitorRetryAttempts<3){
+   visitorRetryAttempts++;
+   clearTimeout(visitorRetryTimer);
+   visitorRetryTimer=setTimeout(()=>{visitorRetryTimer=null;if(auth.currentUser?.uid===uid)void recordVisitor(auth.currentUser);},5000*visitorRetryAttempts);
+  }
+ }
+}
+
+const rawProject=(location.pathname.split("/").filter(Boolean)[0]||"Formwheel");
+const project=(rawProject==="Formwheel"?"Hub":rawProject.replace(/^Formwheel_/i,"")).slice(0,60);
+let publicLive=null, detailLive=null, confirmedAt=0, liveError="";
+let registered=null,disconnect=null,connection=false,generation=0,heartbeatTimer=null,presenceRetryTimer=null,presenceRetries=0;
+const STALE_MS=5*60*1000;
+// Hide abandoned sessions from the admin visitor inspector after ten minutes.
+// Historical unique visitor statistics remain untouched.
+const INSPECTOR_TTL_MS=10*60*1000;
+const inspectorEntries=s=>sessionEntries(s).filter(v=>typeof v.lastSeen==="number"&&v.lastSeen>Date.now()-INSPECTOR_TTL_MS);
+const isFresh=v=>v&&typeof v.lastSeen==="number"&&v.lastSeen<=Date.now()+60000&&Date.now()-v.lastSeen<STALE_MS;
+const stateOf=v=>!v||typeof v!=="object"?"unknown":typeof v.lastSeen!=="number"?"legacy":Date.now()-v.lastSeen>=STALE_MS?"stale":"fresh";
+const sessionEntries=s=>Object.values(s||{}).filter(v=>v&&typeof v==="object");
+const activeEntries=s=>sessionEntries(s).filter(isFresh);
+const say=(message)=>{if(note)note.textContent=message};
+function renderLive(){
+ if(!label)return;
+ const count=publicLive??detailLive;
+ if(!connection)label.textContent="연결 대기 중";
+ else if(detailLive===null&&publicLiveAt&&Date.now()-publicLiveAt>120000)label.textContent="마지막 집계 "+count.toLocaleString("ko-KR")+"명";
+ else if(count!==null)label.textContent=count.toLocaleString("ko-KR")+"명";
+ else label.textContent=liveStatus;
+}
+let lastPublishedLive=null;
+setInterval(()=>{
+ if(detailTotal!==null&&connection&&lastPublishedTotal===null){lastPublishedTotal=detailTotal;publishCount("total",detailTotal)}
+ if(detailLive!==null&&connection){
+  detailLive=Object.values(latestSessions).filter(s=>activeEntries(s).length).length;
+  lastPublishedLive=detailLive;publishCount("live",detailLive);
+ }
+ renderLive();
+},60000);
+const watchSessions=()=>onValue(ref(db,base),snapshot=>{
+ const val=snapshot.val()||{},unique=new Set();
+ latestSessions=val;
+ if(adminUnlocked)renderAdmin();
+ Object.entries(val).forEach(([uid,sessions])=>{if(activeEntries(sessions).length)unique.add(uid)});
+ detailLive=unique.size;renderLive();
+ if(lastPublishedLive!==detailLive){lastPublishedLive=detailLive;publishCount("live",detailLive)}
+  peakCandidate=Math.max(peakCandidate,unique.size);
+  if(peakLoaded&&peakCandidate>recordedPeak)void savePeak();
+ say("최근 5분 내 접속 확인 · 공통 게임 포함");
+},error=>{reportCount("live","원본 읽기 실패 ("+error.code+")");detailLive=null;renderLive();console.debug("접속 상세 조회",error.code)});
+onValue(ref(db,".info/connected"),snapshot=>{connection=snapshot.val()===true;renderLive();if(connection)start(auth.currentUser);else say("연결 재시도 중…")});
+async function clear(){if(heartbeatTimer)clearInterval(heartbeatTimer);heartbeatTimer=null;const old=registered,d=disconnect;registered=null;disconnect=null;confirmedAt=0;renderLive();if(presenceRetryTimer)clearTimeout(presenceRetryTimer);presenceRetryTimer=null;if(old)try{await remove(old)}catch{}if(d)try{await d.cancel()}catch{}}
+async function start(user){
+ const token=++generation;await clear();
+ if(token!==generation||!user||!connection)return;
+ const sessionId=crypto.randomUUID().replace(/-/g,"");
+ const node=ref(db,base+"/"+user.uid+"/"+sessionId);
+ const guard=onDisconnect(node);
+ try{
+  // Register cleanup first so a disconnect during registration cannot leave a ghost.
+  const payload={joinedAt:serverTimestamp(),lastSeen:serverTimestamp(),project,accountType:user.isAnonymous?"guest":"account"};
+  let created=false;
+  try{await guard.remove()}catch(error){
+   // Older deployed Rules authorize deletion only after the session exists.
+   if(!/permission.?denied/i.test(String(error.code||error.message)))throw error;
+   if(token!==generation)return;
+   await set(node,payload);created=true;await guard.remove();
+  }
+  if(token!==generation){if(created)await remove(node);await guard.cancel();return}
+  if(!created)await set(node,payload);
+  if(token!==generation){await remove(node);await guard.cancel();return}
+  registered=node;disconnect=guard;presenceRetries=0;
+  confirmedAt=Date.now();liveError="";renderLive();
+  heartbeatTimer=setInterval(()=>{if(registered===node&&connection)set(ref(db,base+"/"+user.uid+"/"+sessionId+"/lastSeen"),serverTimestamp()).then(()=>{if(registered===node){confirmedAt=Date.now();liveError="";renderLive()}}).catch(error=>{if(registered===node){liveError="접속 갱신 실패";renderLive();retryPresence(user,token,error)}});},60000);
+ }catch(error){
+  // Keep the server cleanup armed if the write's outcome is uncertain.
+  if(token!==generation)return;
+  registered=node;disconnect=guard;
+  confirmedAt=0;liveError="내 접속 등록 실패";renderLive();
+  say("접속자 등록 실패 · Firebase Rules 확인 ("+(error.code||"연결 오류")+")");
+  retryPresence(user,token,error);
+ }
+}
+function retryPresence(user,token,error){
+ const reason=String(error?.code||error?.message||error);
+ if(presenceRetryTimer||presenceRetries>=3||!/network|unavailable|disconnected|timeout/i.test(reason))return;
+ const delay=[5000,15000,30000][presenceRetries++];
+ presenceRetryTimer=setTimeout(()=>{presenceRetryTimer=null;if(token===generation&&connection&&auth.currentUser?.uid===user.uid)void start(user)},delay);
+
+}
+for(const [key,element] of [["live",label],["total",visitorCount]]){
+ if(!element)continue;
+ element.textContent="집계 대기 중";
+ onValue(ref(db,"formwheelV2/publicVisitorCounts/"+key),snapshot=>{
+  updateCount(snapshot.val(),"공개 집계 없음");
+ },error=>{updateCount(null,"공개 집계 조회 실패");console.warn("공개 방문 통계 읽기 실패",key,error.code)});
+ function updateCount(value,status){
+  const raw=value?.count??value;
+  const count=Number.isSafeInteger(raw)&&raw>=0?raw:null;
+  if(key==="live")publicLiveAt=count!==null&&Number.isFinite(value?.updatedAt)?value.updatedAt:0;
+  if(key==="live"){publicLive=count;liveStatus=status;renderLive()}
+  else{publicTotal=count;totalStatus=status;renderTotal();if(adminUnlocked)renderVisitorAdmin()}
+ }
+}
+onValue(ref(db,analyticsPath),snapshot=>{
+ const value=snapshot.val();
+ publicAnalytics=value&&value.schema===1&&typeof value.total==="number"?value:null;
+ publicAnalyticsError="";if(adminUnlocked&&!visitorDetailsReady)renderVisitorAdmin();
+},error=>{publicAnalyticsError=error.code||"조회 실패";if(adminUnlocked&&!visitorDetailsReady)renderVisitorAdmin()});
+let stopDetails=[];
+onAuthStateChanged(auth,async user=>{
+ const ticket=++authGeneration;canPublish=false;presenceRetries=0;
+ if(visitorRetryTimer){clearTimeout(visitorRetryTimer);visitorRetryTimer=null;}
+ visitorRetryAttempts=0;
+ for(const key of ["live","total"])reportCount(key,"공개 집계 구독 중");
+ lastPublishedTotal=null;lastPublishedLive=null;
+ stopDetails.forEach(stop=>stop());stopDetails=[];
+ latestSessions={};latestVisitors={};visitorDetailsReady=false;visitorDetailsError="";detailLive=null;detailTotal=null;liveError="";renderLive();renderTotal();
+ if(user){
+  void start(user);void recordVisitor(user);
+  if(user.isAnonymous)return;
+  try{
+   const {claims}=await getIdTokenResult(user);
+   if(ticket!==authGeneration||auth.currentUser?.uid!==user.uid)return;
+   canPublish=claims.producer===true||claims.admin===true||(claims.email==="not404spam@gmail.com"&&claims.email_verified===true);
+   if(canPublish){stopDetails=[watchSessions(),watchVisitors()];if(peakLoaded&&peakCandidate>recordedPeak)void savePeak()}
+  }catch(error){console.debug("관리자 권한 확인 불가",error.code||error.message)}
+  return;
+ }
+ if(durationTimer)clearInterval(durationTimer);
+ durationTimer=null;recordedVisitorUid=null;durationOwnerUid=null;pendingDurationMs=0;durationRetryAfter=0;
+ void start(null);
+ try{await signInAnonymously(auth)}catch(error){if(ticket!==authGeneration)return;liveError="게스트 인증 실패";renderLive();say("게스트 집계 비활성 · 익명 인증 설정 확인 ("+(error.code||"인증 실패")+")")}
+});
+document.addEventListener("visibilitychange",()=>{
+ const uid=auth.currentUser?.uid;
+ if(document.visibilityState==="hidden")accumulateDuration(uid,{allowHidden:true});
+ else lastActiveTick=Date.now();
+});
+window.addEventListener("pageshow",event=>{
+ if(event.persisted&&connection)void start(auth.currentUser);
+});
+window.addEventListener("pagehide",()=>{
+ if(registered)remove(registered).catch(()=>{});
+ accumulateDuration(auth.currentUser?.uid,{allowHidden:document.visibilityState==="visible"});
+});
+
+/* Administrator presence inspector: UI gate only, not a Firebase security boundary. */
+const presenceRoot=document.getElementById("fw-live-presence");
+let adminUnlocked=false,profileCache=new Map(),profileLoad=0;
+setInterval(()=>{if(adminUnlocked)renderAdmin();},30000);
+if(presenceRoot){
+ const trigger=document.createElement("button");
+ trigger.type="button";trigger.textContent="확인";trigger.title="접속자와 누적 방문 통계 확인";trigger.setAttribute("aria-label","접속자와 누적 방문 통계 확인");
+ trigger.style.cssText="border:0;background:#eef0ff;color:#3439bd;border-radius:999px;padding:3px 6px;font:inherit;font-size:10px;line-height:1.3;font-weight:650;cursor:pointer;white-space:nowrap";
+ presenceRoot.appendChild(trigger);
+ const panel=document.createElement("section");panel.hidden=true;
+ panel.style.cssText="position:fixed;z-index:10002;top:10vh;left:50%;transform:translateX(-50%);width:min(92vw,540px);max-height:80vh;overflow:auto;padding:22px;background:white;color:#242842;border:1px solid #dce1ee;border-radius:20px;box-shadow:0 20px 75px #15204055;text-align:left";
+ panel.innerHTML='<button type="button" id="presence-close" style="float:right;border:0;background:transparent;font-size:23px;cursor:pointer" aria-label="닫기">×</button><h2 style="margin:0 0 10px">📊 접속 통계</h2><form id="presence-code-form"><label for="presence-code">확인 코드</label><input id="presence-code" type="password" autocomplete="off" required style="display:block;margin:8px 0;padding:12px;width:100%;box-sizing:border-box;border:1px solid #ccd2e2;border-radius:10px"><button type="submit" style="background:#3439bd;color:white;border:0;border-radius:10px;padding:10px 18px;cursor:pointer">확인</button></form><p id="presence-message" role="status" style="font-size:13px;color:#64708a"></p><div id="presence-list" hidden></div><div id="visitor-list" hidden></div><p style="font-size:11px;color:#687388">공통 접속 기록이 활성화된 게임 기준 · 마지막 갱신 10분 초과 시 확인 목록에서 자동 제외 · 누적 방문 기록은 유지됩니다.</p>';
+ const report=document.createElement("p");report.id="fw-count-report";panel.appendChild(report);
+ document.body.appendChild(panel);
+ reportCount("live",countsReport.live);
+ const codeForm=panel.querySelector("#presence-code-form"),message=panel.querySelector("#presence-message"),list=panel.querySelector("#presence-list");
+ trigger.addEventListener("click",()=>{panel.hidden=false;if(adminUnlocked)renderAdmin();else panel.querySelector("#presence-code").focus()});
+ panel.querySelector("#presence-close").addEventListener("click",()=>{panel.hidden=true;adminUnlocked=false;codeForm.hidden=false;list.hidden=true;panel.querySelector("#visitor-list").hidden=true;panel.querySelector("#presence-code").value="";profileLoad++});
+ codeForm.addEventListener("submit",event=>{
+  event.preventDefault();
+  if(panel.querySelector("#presence-code").value!=="asdf1340"){message.textContent="확인 코드가 올바르지 않습니다.";return}
+  adminUnlocked=true;codeForm.hidden=true;list.hidden=false;panel.querySelector("#visitor-list").hidden=false;message.textContent="현재 접속 및 누적 방문 통계 · 화면 종료 시 잠금";
+  renderAdmin();
+ });
+}
+function renderAdmin(){
+ if(!adminUnlocked||!presenceRoot)return;
+ const list=document.getElementById("presence-list");if(!list)return;
+ const entries=Object.entries(latestSessions).map(([uid,sessions])=>[uid,inspectorEntries(sessions)]).filter(([,sessions])=>sessions.length);
+ list.replaceChildren();
+ const header=document.createElement("p");header.style.fontWeight="700";const gameCounts={};for(const [,sessions] of entries){for(const game of new Set(activeEntries(sessions).map(v=>typeof v?.project==="string"?(v.project==="Formwheel"?"Hub":v.project.replace(/^Formwheel_/i,"")):"알 수 없음"))){gameCounts[game]=(gameCounts[game]||0)+1}}header.textContent="현재 접속 "+entries.filter(([,s])=>activeEntries(s).length).length+"명 · 확인 목록 "+entries.length+"명 (마지막 갱신 10분 이내) · 위치별 "+Object.entries(gameCounts).map(([k,v])=>k+" "+v+"명").join(" / ");list.appendChild(header);
+ renderVisitorAdmin();
+ if(!entries.length){const empty=document.createElement("p");empty.textContent="최근 10분 내 접속 갱신된 방문자가 없습니다.";list.appendChild(empty);return}
+ entries.slice(0,200).forEach(([uid,sessions])=>{
+  const values=sessionEntries(sessions);
+  const line=document.createElement("div");line.style.cssText="padding:12px 0;border-top:1px solid #e7eaf1";
+  const name=document.createElement("strong");
+  const label=profileCache.get(uid);
+  const kind=values.some(x=>x.accountType==="account")?"로그인 기록":values.some(x=>x.accountType==="guest")?"익명 게스트": "계정 유형 기록 없음";
+  const self=auth.currentUser?.uid===uid?" · 내 현재 계정":"";
+  name.textContent="👤 "+(label||"닉네임 확인 안 됨")+" ("+kind+self+")";line.appendChild(name);
+  const detail=document.createElement("div");detail.style.cssText="font-size:12px;color:#6b7280;margin-top:5px";
+  const joined=values.map(x=>typeof x.joinedAt==="number"?x.joinedAt:null).filter(Boolean);
+  const first=joined.length?new Date(Math.min(...joined)).toLocaleString("ko-KR"):"확인 불가";
+  const locations=[...new Set(values.map(x=>typeof x.project==="string"?(x.project==="Formwheel"?"Hub":x.project.replace(/^Formwheel_/i,"")):"알 수 없음"))];
+  const fresh=values.filter(isFresh).length;
+  const legacy=values.filter(v=>stateOf(v)==="legacy").length;
+  const stale=values.filter(v=>stateOf(v)==="stale").length;
+  const last=Math.max(0,...values.map(v=>typeof v.lastSeen==="number"?v.lastSeen:0));
+  const status=fresh?"🟢 최근 접속 확인":stale?"⚪ 5~10분간 갱신 없음": "❔ 이전 버전 기록 · 상태 불명";
+  detail.textContent=status+" | 📍 "+locations.join(" · ")+" | "+values.length+"개 세션 (활성 "+fresh+", 오래됨 "+stale+", 미확인 "+legacy+") · 최초 접속 "+first+(last?" · 마지막 확인 "+new Date(last).toLocaleString("ko-KR"):"");line.appendChild(detail);list.appendChild(line);
+  if(!profileCache.has(uid)&&values.some(v=>v.accountType==="account"||!v.accountType))loadName(uid);
+ });
+}
+async function loadName(uid){
+ if(profileCache.has(uid))return;
+ profileCache.set(uid,"게스트 / 비공개 사용자");
+ try{
+  const snap=await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js").then(m=>m.get(ref(db,"formwheelV2/hubProfiles/"+uid)));
+  const data=snap.val();
+  const display=typeof data?.nickname==="string"?data.nickname:typeof data?.displayName==="string"?data.displayName:typeof data?.name==="string"?data.name:"";
+  if(display)profileCache.set(uid,display.slice(0,40));
+ }catch{}
+ if(adminUnlocked)renderAdmin();
+}
+
+
+/* Dashboard filters are kept outside render so live Firebase updates don't reset them. */
+const visitorView={period:"all",sort:"newest",type:"all",query:"",page:0,dailyOpen:false,channelOpen:true};
+const VISITOR_PAGE_SIZE=15;
+const kstDay=value=>{
+ const n=Number(value);
+ return Number.isFinite(n)&&n>0?new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Seoul",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(n)):"";
+};
+const safeNumber=value=>Number.isFinite(Number(value))?Math.max(0,Number(value)):0;
+const displayWhen=value=>Number.isFinite(Number(value))&&Number(value)>0?new Date(Number(value)).toLocaleString("ko-KR"):"기록 없음";
+const metric=(label,value)=>{const item=document.createElement("div");item.style.cssText="padding:12px;border-radius:12px;background:#f4f6fd;min-width:0";const l=document.createElement("div");l.style.cssText="font-size:11px;color:#626c83";l.textContent=label;const v=document.createElement("strong");v.style.cssText="font-size:19px;display:block;margin-top:4px;overflow-wrap:anywhere";v.textContent=value;item.append(l,v);return item};
+function renderVisitorAdmin(){
+ const root=document.getElementById("visitor-list");if(!root||!adminUnlocked)return;
+ const existingDaily=root.querySelector("#fw-daily-trend");
+ const existingChannels=root.querySelector("#fw-channel-breakdown");
+ if(existingDaily)visitorView.dailyOpen=existingDaily.open;
+ if(existingChannels)visitorView.channelOpen=existingChannels.open;
+ root.replaceChildren();
+ if(!visitorDetailsReady){
+  const status=document.createElement("section");status.setAttribute("role","status");
+  status.style.cssText="padding:14px;margin:8px 0;border:1px solid #dce1ee;border-radius:12px;background:#f8f9ff";
+  const total=publicTotal===null?"조회 대기 중":publicTotal.toLocaleString("ko-KR")+"명";
+  const headline=document.createElement("h3");headline.textContent="📊 공개 방문자 통계";headline.style.margin="0 0 8px";
+  const figures=document.createElement("p");figures.textContent="👥 누적 방문자 "+total+" · 🏆 최고 동접 "+(peakLoaded?recordedPeak.toLocaleString("ko-KR")+"명":"조회 대기 중");
+  const note=document.createElement("p");note.style.cssText="font-size:12px;line-height:1.6;color:#667085";
+  note.textContent=visitorDetailsError?"상세 기록 조회 오류: "+visitorDetailsError+" · 공개 집계만 표시합니다.": "확인 코드로 공개 합계는 볼 수 있어요. 날짜별 상세 기록, 개별 체류 시간, 유입 경로별 분석은 Firebase 관리자 인증이 필요합니다.";
+  status.append(headline,figures,note);
+  if(publicAnalytics){
+   const summary=document.createElement("p");
+   summary.textContent="🔁 재방문 "+(publicAnalytics.returning??"소수 구간 비공개")+"명 · ⏱ 1분 이상 체류 "+(publicAnalytics.engaged??"소수 구간 비공개")+"명";
+   status.appendChild(summary);
+   const display=(label,items)=>{
+    const block=document.createElement("details");block.open=true;block.style.marginTop="12px";
+    const heading=document.createElement("summary");heading.textContent=label;block.appendChild(heading);
+    for(const [name,count] of Object.entries(items||{}).sort((a,b)=>b[0].localeCompare(a[0]))){
+     const row=document.createElement("p");row.style.margin="5px 0";row.textContent=name+" · "+count+"명";block.appendChild(row);
+    }
+    const caption=document.createElement("small");caption.textContent="5명 미만 구간은 개인정보 보호를 위해 생략";block.appendChild(caption);status.appendChild(block);
+   };
+   display("📅 날짜별 신규 방문자",publicAnalytics.daily);
+   display("🔎 유입 경로별 신규 방문자",publicAnalytics.channels);
+   const download=document.createElement("button");download.type="button";download.textContent="⬇ 익명 통계 CSV";
+   download.style.cssText="padding:9px 12px;margin-top:10px;border:0;border-radius:9px;background:#3439bd;color:#fff";
+   download.onclick=()=>{
+    const rows=[["구분","항목","방문자 수"],...Object.entries(publicAnalytics.daily||{}).map(([k,v])=>["날짜",k,v]),...Object.entries(publicAnalytics.channels||{}).map(([k,v])=>["유입 경로",k,v])];
+    const csv="\\uFEFF"+rows.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(",")).join("\\r\\n");
+    const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    const a=document.createElement("a");a.href=url;a.download="formwheel-anonymous-analytics.csv";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+   };
+   status.appendChild(download);
+  }else{
+   const hint=document.createElement("p");hint.textContent="익명 상세 집계 대기 중"+(publicAnalyticsError?" · "+publicAnalyticsError:"")+" · 공개 통계 Rules 설정과 집계 게시가 필요합니다.";
+   status.appendChild(hint);
+  }
+  root.appendChild(status);return;
+ }
+ const now=Date.now(),today=kstDay(now);
+ const all=visitorEntries().map(([uid,v])=>({uid,v,first:safeNumber(v.firstSeen),last:safeNumber(v.lastVisitAt),ms:safeNumber(v.totalMs),visits:Math.max(1,safeNumber(v.visitCount)),projects:v.projectMs&&typeof v.projectMs==="object"?v.projectMs:{}}));
+ const start=visitorView.period==="7d"?now-7*86400000:visitorView.period==="30d"?now-30*86400000:visitorView.period==="today"?new Date(today+"T00:00:00+09:00").getTime():0;
+ // Historical daily unique traffic cannot be reconstructed; firstSeen measures new visitors.
+ const newPeriod=all.filter(x=>x.first>=start);
+ const recentlySeen=all.filter(x=>x.last>=start);
+ const returned=recentlySeen.filter(x=>x.first<start);
+ const totalMs=all.reduce((s,x)=>s+x.ms,0);
+ const engaged=all.filter(x=>x.ms>=60000).length;
+ const returning=all.filter(x=>x.visits>1).length;
+ const title=document.createElement("h3");title.textContent="📊 방문자 분석 · "+all.length.toLocaleString("ko-KR")+"명";root.appendChild(title);
+ const note=document.createElement("p");note.style.cssText="font-size:12px;color:#687388;line-height:1.65";note.textContent="한국 시간 기준 · 방문자는 Firebase UID 기준(기기 변경·게스트 재설치 시 달라질 수 있음). 30분 이상 간격을 새 세션으로 추정합니다. 기존에 수집하지 않은 접속·체류 기록은 복원할 수 없습니다.";root.appendChild(note);
+ const channelCounts=new Map();
+ const channelNames={blogger:"Blogger",blog:"블로그",threads:"Threads",youtube:"YouTube",instagram:"Instagram",search:"검색",other_external:"기타 외부 링크",direct_or_unknown:"직접/알 수 없음",untracked:"이전 방문 기록"};
+ for(const x of all){const channel=x.v.firstAttribution?.channel||"untracked";channelCounts.set(channel,(channelCounts.get(channel)||0)+1)}
+ const channelPanel=document.createElement("details");channelPanel.id="fw-channel-breakdown";channelPanel.open=visitorView.channelOpen;channelPanel.style.cssText="padding:12px;margin:10px 0;border:1px solid #dce1f3;border-radius:12px";
+ const channelHeading=document.createElement("summary");channelHeading.textContent="🔎 신규 방문 유입 경로";channelHeading.style.cssText="font-weight:700;cursor:pointer";channelHeading.addEventListener("click",event=>{event.preventDefault();visitorView.channelOpen=!channelPanel.open;channelPanel.open=visitorView.channelOpen});channelPanel.appendChild(channelHeading);
+ [...channelCounts].sort((a,b)=>b[1]-a[1]).forEach(([name,count])=>{const p=document.createElement("p");p.style.cssText="font-size:12px;margin:6px 0";p.textContent=(channelNames[name]||name)+" · "+count+"명";channelPanel.appendChild(p)});
+ const channelFoot=document.createElement("p");channelFoot.textContent="최초 방문 기준. 추적 시작 전 기록은 이전 방문 기록으로 표시되며, 직접 방문과 일부 앱 유입은 구별할 수 없습니다.";channelFoot.style.cssText="color:#687388;font-size:11px";channelPanel.appendChild(channelFoot);root.appendChild(channelPanel);
+ // Visitor analytics 2.0: interpret only observed records; do not infer missing sessions.
+ const dayMs=86400000;
+ const validFirst=all.filter(x=>x.first>0);
+ const windowNew=days=>validFirst.filter(x=>x.first>=now-days*dayMs).length;
+ const last7=windowNew(7),prior7=validFirst.filter(x=>x.first>=now-14*dayMs&&x.first<now-7*dayMs).length;
+ const zeroDuration=all.filter(x=>x.ms===0).length;
+ const sourceTracked=all.filter(x=>Boolean(x.v.firstAttribution?.channel)).length;
+ const engagedRatio=all.length?Math.round(engaged/all.length*100):0;
+ const delta=prior7?Math.round((last7-prior7)/prior7*100):null;
+ const insights=document.createElement("section");insights.setAttribute("aria-label","방문 품질 및 성장 분석");
+ insights.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:12px 0";
+ for(const [name,value,sub] of [
+  ["최근 7일 신규",last7+"명",prior7?"이전 7일 대비 "+(delta>=0?"+":"")+delta+"%":"이전 7일 비교 자료 부족"],
+  ["1분 이상 체류",engagedRatio+"%",engaged+" / "+all.length+"명 · 누적 체류 기준"],
+  ["체류 0초 기록",zeroDuration+"명","이탈과 수집 누락 구별 불가"],
+  ["출처 기록률",all.length?Math.round(sourceTracked/all.length*100)+"%":"0%",sourceTracked+" / "+all.length+"명"]
+ ]){
+  const tile=document.createElement("div");tile.style.cssText="padding:11px;border:1px solid #e0e5f2;border-radius:12px;background:#f7f8fd";
+  const label=document.createElement("div");label.style.cssText="font-size:11px;color:#5d6781";label.textContent=name;
+  const num=document.createElement("strong");num.style.cssText="display:block;font-size:19px;margin:5px 0";num.textContent=value;
+  const explanation=document.createElement("div");explanation.style.cssText="font-size:10px;line-height:1.5;color:#687388";explanation.textContent=sub;
+  tile.append(label,num,explanation);insights.appendChild(tile);
+ }
+ root.appendChild(insights);
+ const engagement=document.createElement("p");engagement.style.cssText="font-size:12px;color:#4c5670";engagement.textContent="1분 이상 체류 "+engaged+"명 · 재방문 "+returning+"명 · 목표 300명까지 "+Math.max(0,300-all.length)+"명";root.appendChild(engagement);
+ const toolbar=document.createElement("div");toolbar.style.cssText="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0";
+ function selector(aria,options,current,key){const s=document.createElement("select");s.setAttribute("aria-label",aria);s.style.cssText="font:inherit;font-size:12px;padding:9px;border:1px solid #ccd2e2;border-radius:9px;max-width:100%";options.forEach(([value,label])=>{const o=document.createElement("option");o.value=value;o.textContent=label;s.appendChild(o)});s.value=current;s.onchange=()=>{visitorView[key]=s.value;visitorView.page=0;renderVisitorAdmin()};toolbar.appendChild(s);}
+ selector("분석 기간",[["all","전체 기간"],["today","오늘"],["7d","최근 7일"],["30d","최근 30일"]],visitorView.period,"period");
+ selector("방문자 구분",[["all","전체 유형"],["guest","게스트"],["account","로그인/기타"],["repeat","재방문 기록 있음"]],visitorView.type,"type");
+ selector("정렬",[["newest","최근 최초 방문"],["recent","마지막 방문"],["duration","체류 시간"],["visits","방문 횟수"]],visitorView.sort,"sort");
+ root.appendChild(toolbar);
+ const selectedPeriod=visitorView.period==="all"?"전체 기록":visitorView.period==="today"?"오늘":visitorView.period==="7d"?"7일":"30일";
+ const statsTable=document.createElement("table");statsTable.style.cssText="width:100%;border-collapse:collapse;font-size:12px;margin:6px 0 10px;table-layout:fixed";
+ const rows=[
+  [["누적 방문자",all.length.toLocaleString("ko-KR")+"명"],[selectedPeriod+" 신규",newPeriod.length+"명"]],
+  [[selectedPeriod+" 최근 활동",recentlySeen.length+"명"],["기존 방문자 활동",visitorView.period==="all"?"—":returned.length+"명"]],
+  [["평균 누적 체류",formatDuration(all.length?totalMs/all.length:0)],["재방문 기록",all.filter(x=>x.visits>1).length+"명"]],
+  [["총 기록 세션",all.reduce((sum,x)=>sum+x.visits,0).toLocaleString("ko-KR")+"회"],["게스트",all.filter(x=>x.v.accountType==="guest").length+"명"]]
+ ];
+ rows.forEach((cells,i)=>{const tr=document.createElement("tr");cells.forEach(([name,value])=>{const td=document.createElement("td");td.style.cssText="padding:7px 8px;border-bottom:1px solid #e7eaf1;vertical-align:middle;width:50%";const nameEl=document.createElement("span");nameEl.style.cssText="font-size:11px;color:#687388;display:block";nameEl.textContent=name;const valueEl=document.createElement("strong");valueEl.style.cssText="font-size:14px;display:block;margin-top:2px";valueEl.textContent=value;td.append(nameEl,valueEl);tr.appendChild(td)});statsTable.appendChild(tr)});root.appendChild(statsTable);
+ const goalPct=Math.min(100,all.length/300*100);
+ const goalWrap=document.createElement("div");goalWrap.style.cssText="padding:10px 11px;background:#f4f6fd;border-radius:10px;margin:8px 0 16px";
+ const goalHeader=document.createElement("div");goalHeader.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:12px;margin-bottom:7px";
+ const goalLabel=document.createElement("strong");goalLabel.textContent="🎯 300명 방문자 목표";const goalValue=document.createElement("span");goalValue.textContent=all.length.toLocaleString("ko-KR")+" / 300명 · "+goalPct.toFixed(1)+"%";goalHeader.append(goalLabel,goalValue);
+ const progressTrack=document.createElement("div");progressTrack.setAttribute("role","progressbar");progressTrack.setAttribute("aria-label","300명 방문자 목표 달성률");progressTrack.setAttribute("aria-valuemin","0");progressTrack.setAttribute("aria-valuemax","300");progressTrack.setAttribute("aria-valuenow",String(Math.min(300,all.length)));progressTrack.style.cssText="height:9px;background:#dce1f3;border-radius:999px;overflow:hidden";
+ const progressFill=document.createElement("div");progressFill.style.cssText="height:100%;width:"+goalPct+"%;background:linear-gradient(90deg,#6069dc,#8b5cf6);border-radius:999px;transition:width .3s";progressTrack.appendChild(progressFill);goalWrap.append(goalHeader,progressTrack);root.appendChild(goalWrap);
+ const chartTitle=document.createElement("strong");chartTitle.textContent="📈 신규 방문자 추이 (최근 14일)";root.appendChild(chartTitle);
+ const buckets=[];for(let i=13;i>=0;i--){const d=new Date(now-i*86400000);buckets.push({day:kstDay(d.getTime()),count:0});}
+ const byDay=new Map(buckets.map(x=>[x.day,x]));
+ all.forEach(x=>{const b=byDay.get(kstDay(x.first));if(b)b.count++});
+ const max=Math.max(1,...buckets.map(x=>x.count));
+ const chart=document.createElement("div");chart.style.cssText="display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;align-items:end;height:110px;margin:12px 0 5px;border-bottom:1px solid #c9cfdd";
+ buckets.forEach(b=>{const cell=document.createElement("div");cell.title=b.day+" 신규 "+b.count+"명";cell.style.cssText="display:flex;flex-direction:column;align-items:center;justify-content:end;height:100%;min-width:0";const n=document.createElement("span");n.textContent=b.count||"";n.style.cssText="font-size:9px;color:#525b74";const bar=document.createElement("div");bar.style.cssText="width:100%;max-width:28px;border-radius:4px 4px 0 0;background:#6069dc;height:"+Math.max(2,Math.round(b.count/max*83))+"px";cell.append(n,bar);chart.appendChild(cell)});root.appendChild(chart);
+ const axis=document.createElement("div");axis.style.cssText="display:flex;justify-content:space-between;font-size:11px;color:#697388;margin-bottom:16px";axis.textContent=buckets[0].day+" → "+buckets[13].day;root.appendChild(axis);
+ const projectTotals=new Map();all.forEach(x=>Object.entries(x.projects).forEach(([name,ms])=>{const time=safeNumber(ms);if(time)projectTotals.set(name,(projectTotals.get(name)||0)+time)}));
+ const ranking=[...projectTotals].sort((a,b)=>b[1]-a[1]).slice(0,8);
+ const projectTitle=document.createElement("strong");projectTitle.textContent="🏆 프로젝트별 기록 체류 시간 TOP 8";root.appendChild(projectTitle);
+ const rankingEl=document.createElement("div");rankingEl.style.cssText="margin:8px 0 16px;font-size:12px";
+ if(!ranking.length){rankingEl.textContent="수집된 프로젝트 체류 시간이 없습니다."}
+ ranking.forEach(([name,ms],i)=>{const line=document.createElement("div");line.style.cssText="padding:6px 0;border-bottom:1px solid #edf0f6";const bar=document.createElement("div");bar.style.cssText="height:5px;background:#e8eaf5;border-radius:5px;margin-top:4px;overflow:hidden";const fill=document.createElement("div");fill.style.cssText="height:100%;background:#6069dc;width:"+Math.max(1,ms/ranking[0][1]*100)+"%";bar.appendChild(fill);const caption=document.createElement("div");caption.textContent=(i+1)+". "+name+" · "+formatDuration(ms);line.append(caption,bar);rankingEl.appendChild(line)});root.appendChild(rankingEl);
+ const header=document.createElement("strong");header.textContent="👥 개별 방문 기록";root.appendChild(header);
+ const search=document.createElement("input");search.type="search";search.placeholder="UID 일부 검색 (관리용)";search.setAttribute("aria-label","방문자 검색");search.value=visitorView.query;search.style.cssText="display:block;box-sizing:border-box;width:100%;padding:10px;margin:9px 0;border:1px solid #ccd2e2;border-radius:10px;font:inherit;font-size:12px";search.onchange=()=>{visitorView.query=search.value.trim().toLowerCase();visitorView.page=0;renderVisitorAdmin()};root.appendChild(search);
+ let filtered=all.filter(x=>visitorView.period==="all"||x.last>=start||x.first>=start).filter(x=>visitorView.type==="all"||(visitorView.type==="guest"?x.v.accountType==="guest":visitorView.type==="account"?x.v.accountType!=="guest":x.visits>1)).filter(x=>!visitorView.query||x.uid.toLowerCase().includes(visitorView.query));
+ const order=visitorView.sort==="recent"?"last":visitorView.sort==="duration"?"ms":visitorView.sort==="visits"?"visits":"first";filtered.sort((a,b)=>b[order]-a[order]);
+
+ // Export the currently filtered records, across all pages. Do not export Firebase UIDs.
+ const exportBar=document.createElement("div");exportBar.style.cssText="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0";
+ function csvCell(value){const str=String(value??"");return '"'+( /^[=+@-]/.test(str)?("'"+str):str).replace(/"/g,'""')+'"'}
+ function downloadCsv(filename,rows){const csv="\uFEFF"+rows.map(row=>row.map(csvCell).join(",")).join("\r\n");const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));const a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+ function exportButton(label,callback){const b=document.createElement("button");b.type="button";b.textContent=label;b.style.cssText="padding:10px 12px;border-radius:9px;background:#3439bd;color:white;border:0;font:inherit;font-size:12px;cursor:pointer";b.onclick=callback;exportBar.appendChild(b)}
+ const dayGroups=new Map();
+ for(const x of all){const day=kstDay(x.first)||"날짜 미상";const v=dayGroups.get(day)||{newCount:0,guest:0,account:0};v.newCount++;if(x.v.accountType==="guest")v.guest++;else v.account++;dayGroups.set(day,v)}
+ exportButton("⬇ 방문 기록 CSV",()=>downloadCsv("formwheel-visitors-"+today+".csv",[["번호","계정 유형","최초 방문 (KST)","최근 방문 (KST)","추정 방문 횟수","재방문 횟수","누적 체류 (초)","프로젝트별 체류 (초)"],...filtered.map((x,i)=>[i+1,x.v.accountType==="guest"?"게스트":"로그인/기타",displayWhen(x.first),displayWhen(x.last),x.visits,Math.max(0,x.visits-1),Math.round(x.ms/1000),Object.entries(x.projects).map(([p,ms])=>p+":"+Math.round(safeNumber(ms)/1000)).join(" | ")])]));
+ exportButton("⬇ 유입 경로 CSV",()=>downloadCsv("formwheel-sources-"+today+".csv",[["유입 경로","고유 방문자 수"],...[...channelCounts].sort((a,b)=>b[1]-a[1]).map(([channel,count])=>[channelNames[channel]||channel,count])]));
+ exportButton("⬇ 일별 신규 방문 CSV",()=>downloadCsv("formwheel-daily-"+today+".csv",[["날짜 (KST)","신규 UID","게스트","로그인/기타"],...[...dayGroups].sort((a,b)=>a[0].localeCompare(b[0])).map(([d,v])=>[d,v.newCount,v.guest,v.account])]));
+ root.appendChild(exportBar);
+ const daily=document.createElement("details");daily.id="fw-daily-trend";daily.open=visitorView.dailyOpen;daily.style.cssText="margin:12px 0;padding:10px;border:1px solid #e7eaf1;border-radius:10px";
+ const dailyHead=document.createElement("summary");dailyHead.textContent="📅 날짜별 신규 방문 추이 ("+dayGroups.size+"일)";dailyHead.style.cursor="pointer";dailyHead.addEventListener("click",event=>{event.preventDefault();visitorView.dailyOpen=!daily.open;daily.open=visitorView.dailyOpen});daily.appendChild(dailyHead);
+ const dailyList=document.createElement("div");dailyList.style.cssText="max-height:210px;overflow:auto;font-size:12px;margin-top:8px";
+ [...dayGroups].sort((a,b)=>b[0].localeCompare(a[0])).forEach(([d,v])=>{const p=document.createElement("p");p.textContent=d+" · 신규 "+v.newCount+"명 (게스트 "+v.guest+" / 로그인·기타 "+v.account+")";dailyList.appendChild(p)});daily.appendChild(dailyList);root.appendChild(daily);
+ const pageCount=Math.max(1,Math.ceil(filtered.length/VISITOR_PAGE_SIZE));visitorView.page=Math.min(visitorView.page,pageCount-1);
+ const summary=document.createElement("p");summary.style.cssText="font-size:11px;color:#687388";summary.textContent="조건에 맞는 방문자 "+filtered.length+"명 · "+(visitorView.page+1)+"/"+pageCount+" 페이지";root.appendChild(summary);
+ for(const [index,x] of filtered.slice(visitorView.page*VISITOR_PAGE_SIZE,(visitorView.page+1)*VISITOR_PAGE_SIZE).entries()){
+  const item=document.createElement("details");item.style.cssText="padding:9px 0;border-top:1px solid #e7eaf1;font-size:12px";
+  const head=document.createElement("summary");head.style.cssText="cursor:pointer;line-height:1.7";head.textContent=(visitorView.page*VISITOR_PAGE_SIZE+index+1)+". "+(x.v.accountType==="guest"?"게스트":"로그인/기타")+(x.uid===auth.currentUser?.uid?" (내 계정)":"")+" · "+displayWhen(x.first)+" · "+formatDuration(x.ms);item.appendChild(head);
+  const detail=document.createElement("div");detail.style.cssText="padding:7px 10px;line-height:1.8;color:#526079;overflow-wrap:anywhere";
+  const projectList=Object.entries(x.projects).filter(([,ms])=>safeNumber(ms)>0).sort((a,b)=>safeNumber(b[1])-safeNumber(a[1])).map(([name,ms])=>name+" "+formatDuration(safeNumber(ms))).join(" / ");
+  detail.textContent="마지막 방문: "+displayWhen(x.last)+" · 세션 추정 "+x.visits+"회 · 재방문 "+(x.visits-1)+"회 · 누적 접속 "+formatDuration(x.ms)+" · 프로젝트: "+(projectList||"기록 없음")+" · 식별자(일부): "+x.uid.slice(0,8)+"…";item.appendChild(detail);root.appendChild(item);
+ }
+ const pages=document.createElement("div");pages.style.cssText="display:flex;gap:8px;justify-content:center;margin:12px";
+ for(const [label,delta] of [["← 이전",-1],["다음 →",1]]){const b=document.createElement("button");b.type="button";b.textContent=label;b.disabled=delta<0?visitorView.page===0:visitorView.page>=pageCount-1;b.style.cssText="padding:8px 12px;border-radius:9px;border:1px solid #ccd2e2;background:white;color:#3439bd;cursor:pointer";b.onclick=()=>{visitorView.page+=delta;renderVisitorAdmin()};pages.appendChild(b)}root.appendChild(pages);
+ const caveat=document.createElement("p");caveat.style.cssText="font-size:11px;color:#7a8191;line-height:1.6";caveat.textContent="주의: 신규 방문 추이는 firstSeen 기준이며, 최근 활동 UID는 lastVisitAt 기준입니다. 과거 날짜별 전체 방문 횟수나 유입 경로는 현재 데이터만으로 알 수 없습니다. 관리자 확인 코드는 화면 표시용이며 데이터베이스 보안 권한을 대신하지 않습니다.";root.appendChild(caveat);
+}

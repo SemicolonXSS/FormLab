@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080f1b"><link rel="icon" type="image/svg+xml" href="./assets/formwheel-favicon.svg"><title>BETA LAB | Formwheel Research Facility</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8f5f7;background:#080f1b;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 82% 4%,#123d4b88,transparent 36%),radial-gradient(ellipse at 5% 45%,#22295755,transparent 40%),#080f1b}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;background-image:linear-gradient(#70dbe718 1px,transparent 1px),linear-gradient(90deg,#70dbe718 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(#000,transparent 85%)}
+a{color:#93e9f0;text-decoration:none}a:hover{text-decoration:underline}button,input{font:inherit}button{cursor:pointer}
+.shell{max-width:1240px;margin:auto;padding:0 24px 72px;position:relative}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:74px;border-bottom:1px solid #78e9ef28}
+.brand{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:800;letter-spacing:.15em}.brandmark{display:grid;place-items:center;width:38px;height:38px;border:1px solid #69e2e6aa;border-radius:12px;background:#0e3643;color:#8dfbfa;box-shadow:0 0 24px #26dbe522}
+.toplinks{display:flex;gap:20px;font-size:13px}.toplinks a{color:#b7cbd3}
+.hero{padding:52px 0 34px;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(270px,.65fr);gap:28px;align-items:center}
+.eyebrow{color:#83f0e8;font-size:12px;font-weight:800;letter-spacing:.22em}.eyebrow:before{content:"";display:inline-block;width:7px;height:7px;margin-right:9px;border-radius:50%;background:#73f3dc;box-shadow:0 0 12px #73f3dc}
+h1{font-size:clamp(46px,7vw,86px);line-height:.98;letter-spacing:-.06em;margin:17px 0 20px;font-weight:900}h1 span{color:#80f0e9;text-shadow:0 0 36px #41d9d94a}
+.subtitle{color:#a6bac8;font-size:15px;line-height:1.8;max-width:640px}
+.facility{position:relative;min-height:235px;border:1px solid #58d6e75b;border-radius:22px;background:linear-gradient(145deg,#142c3b,#0a1728 70%);overflow:hidden;box-shadow:inset 0 0 45px #26e8e00d,0 22px 70px #0005}
+.facility:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 18px,#79e7ed09 19px 20px);pointer-events:none}
+.facility .corner{position:absolute;top:18px;left:20px;color:#8bf0ec;font-size:11px;letter-spacing:.17em;font-weight:800}
+.flask{position:absolute;inset:35px 0 0;display:grid;place-items:center;font-size:115px;filter:drop-shadow(0 0 24px #48e6d977);animation:float 5s ease-in-out infinite}
+.facility .serial{position:absolute;right:18px;bottom:17px;color:#7a9bab;font-size:11px;letter-spacing:.15em}
+@keyframes float{50%{transform:translateY(-9px)}}
+.sectionbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:25px 0 17px}.sectionbar h2{margin:0;font-size:17px;letter-spacing:.04em}.tag{border:1px solid #65cbd65a;background:#103440;color:#95f2e7;border-radius:99px;padding:7px 11px;font-size:10px;letter-spacing:.12em;font-weight:800}
+.control{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;border:1px solid #4daab84f;border-radius:18px;background:linear-gradient(120deg,#122737e8,#0e1c2c);padding:22px 25px;box-shadow:0 12px 30px #0002}
+.control h2{font-size:17px;margin:0 0 8px}.control p{margin:4px 0;color:#a6becb;font-size:13px;line-height:1.65}#status{color:#90f5e4!important;min-height:1.5em}
+.danger{border:1px solid #f0a7ad77;background:#3e222c;color:#ffd9dc;border-radius:11px;padding:13px 17px;font-weight:800;transition:.2s}.danger:hover{background:#5d2a37}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}
+.item{position:relative;min-height:225px;display:flex;flex-direction:column;gap:0;padding:23px 19px 19px;border:1px solid #41647a;border-radius:17px;background:linear-gradient(155deg,#172b3b,#101c2c 85%);overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s}
+.item:before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#70e5df,#72a9f2);opacity:.45}.item:hover{transform:translateY(-4px);border-color:#73e6e3;box-shadow:0 14px 35px #0005}
+.item:after{content:"◈";position:absolute;right:18px;top:17px;font-size:21px;color:#5fc4d155}
+.item h3{font-size:15px;line-height:1.4;letter-spacing:.02em;margin:18px 0 10px;padding-right:12px}.item p{font-size:12px;color:#9bb6c4;line-height:1.7;margin:0 0 18px;min-height:44px}
+.item label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;border-top:1px solid #8bb9d026;padding-top:16px;color:#c2d6dd;font-size:12px;font-weight:700}
+.item input{appearance:none;width:45px;height:25px;flex:none;border-radius:99px;background:#34475b;border:1px solid #62798c;position:relative;transition:.2s;cursor:pointer}
+.item input:before{content:"";position:absolute;width:17px;height:17px;left:3px;top:3px;border-radius:50%;background:#c2d0d9;transition:.2s}
+.item input:checked{background:#237b78;border-color:#73f2dd;box-shadow:0 0 16px #58d9d944}.item input:checked:before{transform:translateX(20px);background:#cffff7}
+.item input:disabled{opacity:.55;cursor:wait}.item small{display:block;margin-top:12px;color:#83abb8;font-size:10px;letter-spacing:.09em}
+.safety{margin-top:30px;padding:23px 26px;border:1px solid #36596d;border-radius:17px;background:#0d1d2ce8}.safety h2{font-size:16px;margin:0 0 10px}.safety p{font-size:13px;line-height:1.8;color:#9db6c5;margin:0}
+.footer{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;color:#7195a7;font-size:11px;letter-spacing:.1em;margin-top:30px}
+:focus-visible{outline:3px solid #f8d782;outline-offset:4px}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:650px){.shell{padding:0 16px 50px}.hero{grid-template-columns:1fr;padding-top:35px}.facility{min-height:170px}.flask{font-size:82px;inset:22px 0 0}.control{grid-template-columns:1fr}.danger{width:100%}.grid{grid-template-columns:1fr}.item{min-height:190px}.toplinks{gap:10px;font-size:12px}.brand{letter-spacing:.07em}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style></head>
+<body><main class="shell">
+<header class="topbar"><div class="brand"><span class="brandmark" aria-hidden="true"><img src="./assets/formwheel-favicon.svg" alt="" width="29" height="29"></span><span>FORMWHEEL <span style="color:#8be9e7">/ RESEARCH</span></span></div><nav class="toplinks" aria-label="주 메뉴"><a href="./settings-2.html">← 설정</a><a href="./index.html">허브 ↗</a></nav></header>
+<section class="hero"><div><div class="eyebrow">EXPERIMENTAL RESEARCH FACILITY · 001</div><h1>BETA <span>LAB.</span></h1><p class="subtitle">미래의 Formwheel을 시험하는 비밀 연구 시설. 8개의 실험 모듈을 살펴보고, 원하는 플래그만 활성화하세요. 모든 실험은 기본 OFF이며, 아직 연결되지 않은 기능은 실제 서비스에 영향을 주지 않습니다.</p></div><div class="facility" aria-hidden="true"><span class="corner">RESEARCH CHAMBER // FW-08</span><div class="flask">🧪</div><span class="serial">SECURE · SANDBOX · ALPHA</span></div></section>
+<section aria-label="실험실 제어실"><div class="sectionbar"><h2>01 / CONTROL ROOM</h2><span class="tag">SYSTEM · ALPHA</span></div><div class="control"><div><h2>연구실 상태 모니터</h2><p id="identity" aria-live="polite">설정 확인 중…</p><p id="status" role="status" aria-live="polite"></p></div><button id="reset" class="danger" type="button">⏻ 모든 실험 즉시 OFF</button></div></section>
+<section aria-label="실험 모듈"><div class="sectionbar"><h2>02 / EXPERIMENT MODULES</h2><span class="tag">08 MODULES · OPT-IN</span></div><div class="grid" id="experiments" aria-label="실험 기능 목록"></div></section>
+<section class="safety"><h2>🛡 03 / SAFETY PROTOCOL</h2><p>현재는 실험 기능의 ON/OFF 플래그만 제공하며 실제 실험 기능은 연결되지 않았습니다. 이 페이지는 Rapid 잔액, 업적, 방문자 기록, Firebase 보안 규칙을 수정하지 않습니다. 비로그인 설정은 이 브라우저에 저장되고, 로그인 설정은 계정 UID별로 이 기기에 구분 저장됩니다. 기기 간 동기화는 아직 지원하지 않습니다.</p></section>
+<footer class="footer"><span>FORMWHEEL RESEARCH DIVISION</span><span>BUILD: BETA LAB / VISUAL UPGRADE</span></footer>
+</main><script type="text/plain" data-formlab-blocked="true" type="module" src="./assets/beta-lab.js"></script><div style="position:fixed;inset:0;z-index:2147483647;background:#081523;color:#dff;padding:8vh 7vw;font:18px system-ui"><h1>🧪 FormLab 안전 대기 모드</h1><p>Formwheel 소스 복제 완료. 독립 Firebase 환경이 연결되기 전까지 실행을 차단합니다.</p><a style="color:#8ef" href="https://semicolonxss.github.io/Formwheel/beta-lab.html">BETA LAB 제어실</a></div></body></html>

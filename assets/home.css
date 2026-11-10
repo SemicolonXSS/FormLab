@@ -1,0 +1,64 @@
+/* Formwheel Hub personalized home */
+#fw-home{margin:22px 0 24px}#fw-home h2{font-size:20px;margin:0}#fw-home .fw-home-section{margin:18px 0}#fw-home .fw-home-section>div:first-child{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px}
+.fw-home-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.fw-home-card{border:1px solid #e4e7ef;background:#fff;border-radius:14px;padding:10px;min-width:0;display:flex;flex-direction:column;justify-content:space-between}
+.fw-home-link{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;min-width:0;padding:6px 0}.fw-home-emoji{font-size:29px}.fw-home-link strong{font-size:14px;overflow-wrap:anywhere}.fw-home-link small{font-size:11px;color:#667085}
+.fw-home-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:5px}.fw-home-actions button,#fw-edit-toggle,#fw-excluded-show,.fw-edit-item button,#fw-edit-save,#fw-edit-cancel{border:1px solid #dce1ec;border-radius:9px;background:#f6f8ff;padding:7px 9px;font-size:12px;color:#273c73;cursor:pointer}
+.fw-home-actions button{flex:1;min-width:65px}.fw-edit-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border-bottom:1px solid #e8eaf1}.fw-edit-item>span:last-child{display:flex;gap:5px}
+#fw-home-editor{background:#f6f8fc;border-radius:12px;padding:12px}#fw-home-editor[hidden],#fw-pinned-section[hidden],#fw-recommended-empty[hidden],#fw-excluded-list[hidden],#fw-filter-panel[hidden]{display:none!important}
+#fw-home-status{min-height:18px;color:#656f82;font-size:12px}#fw-excluded-list{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}#fw-excluded-list button{padding:7px;border-radius:8px;border:1px solid #dce1ec;background:#fff}
+#fw-filter-toggle{display:none}#fw-filter-count{font-size:11px;color:#657187}
+@media(max-width:700px){#fw-filter-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px;background:#fff;border:1px solid #e4e7ed;border-radius:11px;margin:10px 0;font-weight:700}#fw-filter-panel{display:flex;flex-wrap:wrap}#fw-home{margin:16px 0 20px}.fw-home-grid{gap:7px}.fw-home-card{padding:7px}.fw-home-actions button{font-size:11px;padding:7px 4px}}
+@media(max-width:359px){.fw-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.fw-install[hidden]{display:none!important}
+
+/* Footer ID profile customization */
+#fw-account{max-width:580px;margin:12px auto 28px;padding:18px;background:#fff;border:1px solid #e3e6ee;border-radius:16px;color:#202638;text-align:left}
+#fw-account h3{font-size:19px;margin:0 0 14px}.fw-id-panel{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;font-size:13px}
+#fw-account button{border:0;background:#3439bd;color:white;border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:700}
+#fw-account button[hidden]{display:none!important}
+.fw-profile-preview{display:flex;align-items:center;gap:13px;padding:15px 0}
+#fw-profile-avatar{display:flex;align-items:center;justify-content:center;width:58px;height:58px;border-radius:15px;color:white;font-size:30px}
+.fw-profile-preview p{margin:4px 0;color:#6a7080;font-size:12px}
+#fw-profile-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}#fw-profile-form label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:#384056}
+#fw-profile-form input,#fw-profile-form select{height:40px;padding:8px;border:1px solid #d9dfeb;border-radius:9px;background:white;font:inherit;min-width:0}
+#fw-profile-form button{grid-column:1/-1}#fw-profile-status{min-height:16px;font-size:12px;color:#596579}
+@media(max-width:500px){#fw-profile-form{grid-template-columns:1fr}#fw-account{padding:14px}}
+
+/* Persistent upper-right profile navigation */
+header .fw-profile-trigger{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;text-decoration:none;background:#eef0ff;border:1px solid #dfe3f5;overflow:hidden}
+#fw-header-avatar{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;background:#6366f1;color:white;font-size:21px}
+header nav{min-width:0}
+@media(max-width:700px){header .fw-profile-trigger{width:40px;height:40px}#fw-header-avatar{width:35px;height:35px}header nav{flex:1}}
+
+/* Compact recommendation cards on Hub */
+#fw-home .fw-home-section:has(#fw-recommended-cards){margin:10px 0}
+#fw-recommended-cards{gap:7px}
+#fw-recommended-cards .fw-home-card{padding:6px 7px;border-radius:11px}
+#fw-recommended-cards .fw-home-link{gap:3px;padding:3px 0}
+#fw-recommended-cards .fw-home-emoji{font-size:22px}
+#fw-recommended-cards .fw-home-link strong{font-size:12px}
+#fw-recommended-cards .fw-home-link small{font-size:10px}
+#fw-recommended-cards .fw-home-actions{gap:4px}
+#fw-recommended-cards .fw-home-actions button{padding:5px 4px;font-size:10px;min-width:0}
+@media(max-width:700px){#fw-recommended-cards{gap:5px}#fw-recommended-cards .fw-home-card{padding:5px}#fw-recommended-cards .fw-home-emoji{font-size:19px}#fw-recommended-cards .fw-home-link strong{font-size:11px}}
+
+/* Accessibility improvements: keyboard and touch, 2026-10-14 */
+#fw-home :where(a,button,input,select):focus-visible,
+#fw-filter-toggle:focus-visible{
+  outline:3px solid #3146c9;
+  outline-offset:3px;
+}
+@media (pointer:coarse){
+  #fw-home .fw-home-actions button,
+  #fw-home #fw-edit-toggle,
+  #fw-home #fw-excluded-show,
+  #fw-filter-toggle{min-height:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  #fw-home *,#fw-home *::before,#fw-home *::after{
+    animation-duration:.01ms!important;
+    transition-duration:.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}

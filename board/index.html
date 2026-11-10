@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#202940">
+  <meta name="description" content="Formwheel Board: 체스, 바둑, 오목, 오델로를 규칙과 함께 즐기는 한 기기 2인용 보드게임 모음">
+  <title>Board · Formwheel</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/formwheel-favicon.svg">
+  <link rel="stylesheet" href="./board.css?v=20261026-bot1">
+  <script type="text/plain" data-formlab-blocked="true" src="./board.js?v=20261026-extra2" defer></script>
+  <script type="text/plain" data-formlab-blocked="true" src="./online.js?v=20261026-checkers1" type="module"></script>
+</head>
+<body>
+<header class="top">
+  <a href="../" class="brand" aria-label="Formwheel 허브로 돌아가기">◉ Formwheel</a>
+  <span class="tag">BOARD · 클래식 보드게임</span>
+</header>
+<main>
+  <section class="intro">
+    <h1>🎲 Board</h1>
+    <p>체스부터 바둑까지! <strong>규칙을 읽고 바로 두는</strong> 클래식 보드게임 모음입니다.</p>
+    <p class="note">로컬 2인 대전과 온라인 방 코드 대전을 지원합니다. 혼자서 AI 봇과도 대전할 수 있습니다. 순위표는 아직 지원하지 않습니다.</p>
+  </section>
+  <nav id="game-tabs" class="tabs" aria-label="게임 선택">
+    <button type="button" data-game="chess" aria-pressed="true">♟ 체스</button>
+    <button type="button" data-game="go" aria-pressed="false">⚫ 바둑</button>
+    <button type="button" data-game="omok" aria-pressed="false">⚪ 오목</button>
+    <button type="button" data-game="othello" aria-pressed="false">◉ 오델로</button>
+    <button type="button" data-game="checkers" aria-pressed="false">🔴 체커</button>
+    <button type="button" data-game="ttt" aria-pressed="false">❎ 틱택토</button>
+    <button type="button" data-game="connect4" aria-pressed="false">🔵 커넥트 포</button>
+    <button type="button" data-game="territory" aria-pressed="false">🏰 영토 쟁탈전</button>
+  </nav>
+  <section class="online-panel" aria-label="AI 봇 상대" id="bot-panel">
+    <div class="online-heading"><div><h2>🤖 AI 봇 대전</h2><p>체스 · 바둑 · 오목 · 오델로 · 체커 · 틱택토 · 커넥트 포 · 영토 쟁탈전에서 봇과 대결하세요. 온라인 방에서는 봇이 꺼집니다.</p></div><span class="online-label">혼자 플레이</span></div>
+    <div class="online-controls">
+      <label for="bot-difficulty">난이도</label>
+      <select id="bot-difficulty"><option value="easy">쉬움</option><option value="normal" selected>보통</option><option value="hard">어려움</option></select>
+      <button id="bot-toggle" class="primary" type="button" aria-pressed="false">🤖 봇 대전 시작</button>
+      <span id="bot-status" role="status" aria-live="polite">현재: 로컬 2인 대전</span>
+    </div>
+  </section>
+  <section class="online-panel" aria-labelledby="online-heading">
+    <div class="online-heading"><div><h2 id="online-heading">🌐 친구와 온라인 보드게임</h2><p>게임을 고른 뒤 방을 만들거나 친구가 보낸 8자리 코드를 입력하세요. 2명까지 참가할 수 있습니다.</p></div><span class="online-label">2인 대전</span></div>
+    <div id="online-setup" class="online-controls">
+      <button type="button" class="primary" id="online-create">방 만들기</button>
+      <label for="online-code">초대 코드</label>
+      <input id="online-code" type="text" maxlength="8" autocomplete="off" spellcheck="false" inputmode="text" placeholder="8자리 코드" aria-label="온라인 방 초대 코드">
+      <button type="button" id="online-join">코드로 참가</button>
+    </div>
+    <div id="online-active" class="online-controls" hidden>
+      <strong id="online-room" class="online-room"></strong>
+      <button id="online-copy" type="button">초대 링크 복사</button>
+      <button id="online-leave" type="button">로컬 모드로 나가기</button>
+    </div>
+    <p id="online-status" role="status" aria-live="polite">Firebase 연결 중… 로컬 대전은 계속 가능합니다.</p>
+    <p class="online-notice">체커·틱택토·커넥트 포·영토 쟁탈전은 현재 로컬 2인·봇 대전 전용입니다. 온라인 방은 기존 4종만 지원합니다.</p>
+    <p class="online-notice">방을 만든 사람이 선공입니다. 온라인 대전에서는 되돌리기·새 게임을 잠시 사용할 수 없습니다. 현재는 기록·보상 없는 친선 대전이며, 계정 인증 및 Firebase Database Rules가 필요합니다.</p>
+  </section>
+  <section class="workspace">
+    <div class="play-area">
+      <div class="play-top">
+        <div><h2 id="game-title">체스</h2><p id="turn" role="status" aria-live="polite"></p></div>
+        <div class="controls">
+          <label id="size-wrap" hidden>바둑판
+            <select id="board-size" aria-label="바둑판 크기"><option value="9">9×9 (입문)</option><option value="13">13×13</option><option value="19">19×19</option></select>
+          </label>
+          <button type="button" id="new-game">새 게임</button>
+          <button type="button" id="undo">한 수 무르기</button>
+          <button type="button" id="pass" hidden>패스</button>
+          <button type="button" id="claim" hidden>무승부 주장</button>
+        </div>
+      </div>
+      <div id="score" class="score" aria-live="polite"></div>
+      <div class="board-wrap"><div id="board" role="group" aria-label="보드게임 판"></div></div>
+      <p id="tip" class="tip"></p>
+    </div>
+    <aside class="rules-area">
+      <details open id="rules-panel">
+        <summary>📚 게임 규칙 보기</summary>
+        <h3 id="rule-title"></h3>
+        <ol id="rule-list"></ol>
+        <p id="rule-note"></p>
+      </details>
+      <div class="help">
+        <strong>💡 플레이 방법</strong>
+        <p>자기 차례에 말을 선택하고 이동하거나, 빈 칸을 눌러 착수하세요. 한 수 무르기는 로컬 대전에서만 작동합니다. 온라인 방에서는 선공과 후공이 고정됩니다.</p>
+      </div>
+    </aside>
+  </section>
+  <section class="planned" aria-labelledby="planned-title">
+    <div class="planned-head"><h2 id="planned-title">🎯 창작 보드게임 — 기획 중</h2><p>이 게임들은 아직 플레이할 수 없는 <strong>규칙 초안</strong>입니다. 위의 8종을 플레이할 수 있습니다. 커넥트 포와 창작 게임 영토 쟁탈전도 추가됐어요.</p></div>
+    <div class="planned-grid">
+      <details><summary>🏘️ 부동산 제국 <small>2~4인 · 경제</small></summary><ol><li>차례마다 주사위 2개를 굴려 이동하고, 주인이 없는 땅을 구매합니다.</li><li>소유한 땅에 들어온 다른 플레이어는 통행료를 내며, 세트를 모으면 건물을 올릴 수 있습니다.</li><li>20턴 종료 시 현금·땅·건물 가치 합산이 가장 높은 사람이 승리합니다. 파산하면 탈락합니다.</li></ol></details>
+      <details><summary>🕵️ 배신자의 밤 <small>4~8인 · 추리</small></summary><ol><li>시민과 배신자 역할을 비밀리에 나눕니다. 배신자는 자신의 정체를 숨깁니다.</li><li>라운드마다 단서를 공개하고 토론한 다음, 다수결로 한 명을 조사합니다.</li><li>배신자가 밝혀지면 시민이, 3라운드가 끝나도록 숨기면 배신자가 승리합니다.</li></ol></details>
+      <details><summary>🏰 왕국 전쟁 <small>2~4인 · 전략</small></summary><ol><li>차례마다 자원을 얻고 병력 모집·이동·방어 중 행동을 고릅니다.</li><li>인접 지역에 병력을 보내 점령하며, 본성은 특별 방어력으로 보호됩니다.</li><li>12라운드 뒤 차지한 영토와 남은 본성 점수를 합산해 승자를 정합니다.</li></ol></details>
+      <details><summary>🎲 운명의 30칸 <small>2~6인 · 주사위</small></summary><ol><li>차례마다 주사위를 굴려 30칸 길을 전진합니다.</li><li>이벤트 칸에서는 카드 1장을 뽑아 이동·교환·방어 같은 효과를 사용합니다.</li><li>먼저 30번 칸 이상에 도착하면 승리하며, 아이템은 자기 턴에 1개만 사용합니다.</li></ol></details>
+      <details><summary>💎 비밀 경매장 <small>3~6인 · 심리전</small></summary><ol><li>모든 플레이어는 같은 코인으로 시작해 각 라운드에 동시에 비밀 입찰합니다.</li><li>가장 높은 금액을 단독 입찰한 사람이 보물을 얻고 입찰금을 냅니다. 공동 최고 입찰이면 해당 인원끼리 다시 입찰합니다.</li><li>8라운드 후 보물 점수 합계가 가장 높은 사람이 승리합니다.</li></ol></details>
+      <details><summary>⬡ HEX 점령전 <small>2~4인 · 추상 전략</small></summary><ol><li>차례에 자신의 기존 타일과 접한 육각형 빈 칸 하나를 점령합니다.</li><li>상대의 진로를 막거나 내 구역을 넓힐 수 있지만, 이미 점령된 칸은 바꿀 수 없습니다.</li><li>20라운드가 끝나면 차지한 타일 수가 가장 많은 플레이어가 승리합니다.</li></ol></details>
+    </div>
+  </section>
+  <p class="bottom-note">판정 참고: 바둑은 자살수·따냄·동형반복 금지 및 간이 중국식 집계를 사용합니다. 사석 판정은 자동으로 처리하지 않으므로 결과가 공식 대국과 다를 수 있습니다.</p>
+</main>
+<div id="promotion" class="modal" hidden>
+  <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="promotion-title">
+    <h2 id="promotion-title">폰 승격</h2>
+    <p>승격할 기물을 선택하세요.</p>
+    <div id="promotion-options" class="promotion-options"></div>
+    <button type="button" id="cancel-promotion">취소</button>
+  </div>
+</div>
+<div style="position:fixed;inset:0;z-index:2147483647;background:#081523;color:#dff;padding:8vh 7vw;font:18px system-ui"><h1>🧪 FormLab 안전 대기 모드</h1><p>Formwheel 소스 복제 완료. 독립 Firebase 환경이 연결되기 전까지 실행을 차단합니다.</p><a style="color:#8ef" href="https://semicolonxss.github.io/Formwheel/beta-lab.html">BETA LAB 제어실</a></div></body>
+</html>

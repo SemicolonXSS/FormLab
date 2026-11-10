@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SECOL LAB | Formwheel</title><link rel="icon" href="./assets/formwheel-favicon.svg">
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#38205d,#100d20 70%);color:#f6f0ff}
+main{max-width:740px;margin:auto;padding:24px 16px 70px}a{color:#cbb9ff}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{font-size:clamp(30px,7vw,50px);margin:34px 0 8px}p{line-height:1.7;color:#d8cce9}
+.panel{background:#211932;border:1px solid #655084;border-radius:22px;padding:23px;margin-top:20px;box-shadow:0 15px 35px #0003}
+button{background:#a78bfa;color:#140c26;border:0;border-radius:12px;padding:13px 18px;font:inherit;font-weight:800;cursor:pointer}
+button:hover{background:#c3afff}button:focus-visible,a:focus-visible{outline:3px solid #fff;outline-offset:3px}
+#result{min-height:100px;font-size:20px;font-weight:700;white-space:pre-line}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}
+.badge{padding:15px;border-radius:14px;background:#302540;border:1px solid #57466e}
+.badge.locked{opacity:.5}.small{font-size:13px;color:#c8badc}
+#secret{display:none}#secret.show{display:block}
+
+#secol-effect-reset{position:fixed;bottom:14px;right:14px;z-index:9999;background:#f4e8ff;color:#1a102a;border:2px solid #5d3c8e}
+body.secol-gravity main{transform:rotate(180deg)}
+body.secol-gravity{overflow-x:hidden}
+body.secol-purple{background:radial-gradient(ellipse at center,#9857df,#27123f 75%)}
+body.secol-glitch main{filter:hue-rotate(110deg)}
+body.secol-stardust main{filter:drop-shadow(0 0 9px #e5c8ff)}
+@media(prefers-reduced-motion:no-preference){main{transition:transform .5s ease,filter .5s ease}}
+</style></head><body><main>
+<header><strong>🧪 SECOL LAB</strong><a href="./">← Formwheel</a></header>
+<h1>세콜의 비밀 연구소</h1><p>아무도 모르게 시작된 다섯 가지 실험. 오늘은 어떤 이상한 일이 일어날까?</p>
+<section class="panel"><h2>🎲 랜덤 실험</h2><p>실험은 기기 안에서만 진행되며 Rapid나 계정 데이터에 영향을 주지 않아.</p>
+<button id="run">실험 시작</button><p id="result" role="status" aria-live="polite">실험 준비 완료.</p>
+<p class="small" id="count"></p></section>
+<section class="panel" id="extra-lab"><h2>🌌 차원 탐험</h2><p>세 가지 차원문을 발견해 봐! 새로운 문을 열면 연구 XP가 쌓여.</p><div class="grid"><button data-secol-door="0">🌙 달의 복도</button><button data-secol-door="1">🪞 거울 방</button><button data-secol-door="2">🌠 별의 정원</button></div><p id="secol-explore-result" role="status"></p><p id="secol-xp"></p><h2>📖 탐험 도감</h2><div id="secol-door-list" class="grid"></div><button id="secol-export">탐험 기록 내보내기</button></section><section class="panel"><h2>🏆 비밀 업적</h2><div class="grid" id="achievements"></div></section>
+<section class="panel"><h2>🧩 세콜의 암호 퍼즐</h2><p>숫자가 두 배씩 커져. 다음 숫자는?</p><p><strong>2 → 4 → 8 → 16 → ?</strong></p><input id="secol-puzzle-input" type="number" inputmode="numeric" aria-label="퍼즐 정답" style="padding:12px;border-radius:10px;max-width:140px;background:#120e20;color:white;border:1px solid #8972aa"><button id="secol-puzzle-check">정답 확인</button><p id="secol-puzzle-result" role="status" aria-live="polite"></p></section>
+<section class="panel"><h2>⏳ 시간 정지 실험</h2><p>연구소 시계를 5초 동안 멈춰 봐. 실제 시간은 계속 흐르지만 화면의 시계는 정지해.</p><p id="secol-clock" style="font-size:30px;font-weight:800;font-variant-numeric:tabular-nums">--:--:--</p><button id="secol-freeze">시간 정지 시작</button><p id="secol-freeze-result" role="status"></p></section><section class="panel"><h2>🔐 숨겨진 문</h2><p>힌트: 연구소 이름을 영어로 입력해 봐.</p><input id="code" aria-label="비밀 암호" autocomplete="off" style="padding:12px;border-radius:10px;width:65%;background:#120e20;color:white;border:1px solid #8972aa"><button id="unlock">확인</button><p id="secret" role="status">👾 비밀 문이 열렸다! 연구소의 숨겨진 방을 발견했어.</p></section>
+<p class="small">저장 위치: 이 브라우저의 로컬 저장소 · 서버 전송 없음</p>
+</main><button id="secol-effect-reset" type="button" hidden>↩ 화면 원상복구</button><script type="text/plain" data-formlab-blocked="true">
+(()=>{'use strict';
+const key='fw-secol-lab-v1';
+let data={runs:0,seen:[],unlocked:[]};
+try{const v=JSON.parse(localStorage.getItem(key)||'null');if(v&&typeof v==='object'){data.runs=Number.isSafeInteger(v.runs)&&v.runs>=0?v.runs:0;data.seen=Array.isArray(v.seen)?v.seen.filter(Number.isInteger):[];data.unlocked=Array.isArray(v.unlocked)?v.unlocked.filter(x=>typeof x==='string'):[]}}catch{}
+const experiments=['🪐 중력 반전! 연구소의 천장이 바닥이 되었다.','🌌 보라색 차원문이 나타났다.','👾 작은 오류 생명체가 인사를 건넸다.','⏳ 시간이 3초 멈춘 것 같은 기분이다.','🎵 아무 소리도 나지 않는 음악 실험 성공!','✨ 별가루가 실험실 전체에 퍼졌다.','🧩 알 수 없는 퍼즐 조각을 발견했다.'];
+const awards=[['first','첫 번째 실험'],['five','끈질긴 연구원'],['ten','실험 마스터'],['all','모든 현상 발견'],['door','비밀의 문']];
+const $=id=>document.getElementById(id);
+function save(){try{localStorage.setItem(key,JSON.stringify(data))}catch{}}
+function award(id){if(!data.unlocked.includes(id))data.unlocked.push(id)}
+function render(){$('count').textContent='실험 '+data.runs+'회 · 발견한 현상 '+new Set(data.seen).size+'/'+experiments.length;
+$('achievements').replaceChildren(...awards.map(([id,name])=>{const el=document.createElement('div');const ok=data.unlocked.includes(id);el.className='badge'+(ok?'':' locked');el.textContent=(ok?'🏆 ':'🔒 ')+name;return el}))}
+$('run').addEventListener('click',()=>{let i=Math.floor(Math.random()*experiments.length);if(data.seen.length<experiments.length){const remaining=experiments.map((_,j)=>j).filter(j=>!data.seen.includes(j));i=remaining[Math.floor(Math.random()*remaining.length)]}
+data.runs++;if(!data.seen.includes(i))data.seen.push(i);award('first');if(data.runs>=5)award('five');if(data.runs>=10)award('ten');if(data.seen.length===experiments.length)award('all');$('result').textContent=experiments[i];save();render()});
+$('unlock').addEventListener('click',()=>{if($('code').value.trim().toLowerCase().replace(/\s+/g,'')==='secol'){$('secret').classList.add('show');award('door');save();render()}else{$('secret').classList.remove('show');$('secret').textContent='암호가 틀렸어. 다시 시도해 봐!';$('secret').classList.add('show')}});
+render();
+})();
+</script><script type="text/plain" data-formlab-blocked="true">
+(()=>{'use strict';
+const key='fw-secol-exploration-v1',names=['달의 복도','거울 방','별의 정원'];
+let state={doors:[],visits:0};
+try{const old=JSON.parse(localStorage.getItem(key)||'null');if(old&&typeof old==='object'){state.doors=Array.isArray(old.doors)?[...new Set(old.doors.filter(n=>Number.isInteger(n)&&n>=0&&n<3))]:[];state.visits=Number.isSafeInteger(old.visits)&&old.visits>=0?old.visits:0}}catch{}
+const $=id=>document.getElementById(id);
+function render(){$('secol-xp').textContent='연구 XP '+(state.visits*5+state.doors.length*15)+' · 방문 '+state.visits+'회';$('secol-door-list').replaceChildren(...names.map((name,i)=>{const el=document.createElement('div');el.className='badge'+(state.doors.includes(i)?'':' locked');el.textContent=state.doors.includes(i)?'✨ '+name:'🔒 미발견 차원';return el}))}
+document.querySelectorAll('[data-secol-door]').forEach(b=>b.addEventListener('click',()=>{const i=Number(b.dataset.secolDoor),fresh=!state.doors.includes(i);if(fresh)state.doors.push(i);state.visits++;$('secol-explore-result').textContent=['달빛 발자국을 발견했어!','거울 속 세계가 인사를 건넸어!','별들이 비밀 메시지를 남겼어!'][i]+(fresh?' 최초 발견!':' 다시 방문!');try{localStorage.setItem(key,JSON.stringify(state))}catch{}render()}));
+$('secol-export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({app:'SECOL LAB',date:new Date().toISOString(),state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='secol-lab-exploration.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+render();
+})();
+</script>
+<script type="text/plain" data-formlab-blocked="true">
+(()=>{'use strict';
+const reset=document.getElementById('secol-effect-reset');
+const run=document.getElementById('run');
+const result=document.getElementById('result');
+const effects=['secol-gravity','secol-purple','secol-glitch','secol-stardust'];
+let timer=null;
+function clear(){document.body.classList.remove(...effects);reset.hidden=true;if(timer!==null)window.clearTimeout(timer);timer=null}
+function update(){clear();const value=result.textContent||'';
+let effect=null;
+if(value.includes('중력 반전'))effect='secol-gravity';
+else if(value.includes('보라색 차원문'))effect='secol-purple';
+else if(value.includes('오류 생명체'))effect='secol-glitch';
+else if(value.includes('별가루'))effect='secol-stardust';
+if(effect){document.body.classList.add(effect);reset.hidden=false;timer=window.setTimeout(clear,6000)}}
+run.addEventListener('click',update);
+reset.addEventListener('click',clear);
+window.addEventListener('pagehide',clear);
+})();
+</script><script type="text/plain" data-formlab-blocked="true">
+(()=>{'use strict';
+const $=id=>document.getElementById(id);
+const puzzleKey='fw-secol-puzzle-solved-v1';
+let solved=false;try{solved=localStorage.getItem(puzzleKey)==='yes'}catch{}
+function check(){if(Number($('secol-puzzle-input').value)===32&&$('secol-puzzle-input').value.trim()!==''){$('secol-puzzle-result').textContent=solved?'🧩 이미 풀었던 퍼즐이야!':'🎉 정답! 비밀 퍼즐 발견 완료!';solved=true;try{localStorage.setItem(puzzleKey,'yes')}catch{}}else $('secol-puzzle-result').textContent='아직 정답이 아니야. 숫자 사이의 규칙을 찾아봐.'}
+$('secol-puzzle-check').addEventListener('click',check);
+$('secol-puzzle-input').addEventListener('keydown',e=>{if(e.key==='Enter')check()});
+let frozen=false,timeout=null,clockTimer=null;
+function tick(){if(!frozen)$('secol-clock').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false})}
+function unfreeze(){frozen=false;if(timeout!==null)clearTimeout(timeout);timeout=null;$('secol-freeze').disabled=false;$('secol-freeze-result').textContent='▶ 시간이 다시 흐르기 시작했어.';tick()}
+$('secol-freeze').addEventListener('click',()=>{if(frozen)return;tick();frozen=true;$('secol-freeze').disabled=true;$('secol-freeze-result').textContent='⏸ 화면 속 시계가 멈췄어!';timeout=setTimeout(unfreeze,5000)});
+clockTimer=setInterval(tick,250);window.addEventListener('pagehide',()=>{if(timeout!==null)clearTimeout(timeout);if(clockTimer!==null)clearInterval(clockTimer)});
+tick();
+})();
+</script><div style="position:fixed;inset:0;z-index:2147483647;background:#081523;color:#dff;padding:8vh 7vw;font:18px system-ui"><h1>🧪 FormLab 안전 대기 모드</h1><p>Formwheel 소스 복제 완료. 독립 Firebase 환경이 연결되기 전까지 실행을 차단합니다.</p><a style="color:#8ef" href="https://semicolonxss.github.io/Formwheel/beta-lab.html">BETA LAB 제어실</a></div></body></html>

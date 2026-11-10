@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Formwheel 플레이테스터 모집</title>
+<link rel="icon" href="./assets/formwheel-favicon.svg" type="image/svg+xml">
+<style>
+*{box-sizing:border-box}body{font:16px/1.65 system-ui,sans-serif;background:#f5f6ff;color:#20263a;margin:0}
+main{max-width:680px;margin:18px auto;padding:20px;background:white;border-radius:22px;box-shadow:0 12px 40px #25326716}
+h1{margin:7px 0;font-size:26px}h2{font-size:19px}label{display:block;margin:10px 0 4px;font-weight:700}
+input,select,textarea,button{width:100%;padding:9px 11px;border-radius:10px;border:1px solid #cbd2e5;font:inherit}
+button{background:#453ac4;color:white;font-weight:700;cursor:pointer;margin-top:8px}
+button:focus-visible,a:focus-visible{outline:3px solid #f5a623;outline-offset:3px}
+p,small{color:#59617a}a{color:#453ac4}
+#status{font-weight:700}section{margin:16px 0;border-top:1px solid #e4e7f1;padding-top:12px}
+.challenge{background:#f7f6ff;border:1px solid #d6d3f5;padding:13px;border-radius:16px}
+.challenge h2{margin:0 0 8px}.challenge strong{color:#2d2479}
+#find10-result{padding:9px 0;font-weight:700}#find10-target{font-size:18px;font-weight:750;color:#252058}
+#find10-prepare[hidden],#find10-result[hidden],#guide[hidden]{display:none}
+.secondary{background:white;color:#453ac4;border:1px solid #aca6df}
+.compact-field{max-width:230px}.compact-field select{padding:7px 9px}
+.compact-clear{width:auto;padding:5px 10px;font-size:13px;margin-top:5px}
+#apply-notes,#find10-notes{min-height:38px;resize:vertical}
+.challenge p{margin:7px 0}.challenge small{display:block;margin-top:8px}
+@media(max-width:480px){main{margin:8px;padding:15px;border-radius:14px}.compact-field{max-width:100%}h1{font-size:23px}}
+</style>
+<link rel="stylesheet" href="./assets/formwheel-brand.css"><style>.fw-brand-strip{display:flex;align-items:center;min-height:48px;padding:9px 16px;background:#fff!important;border-bottom:1px solid #dce2eb;position:relative;z-index:5}</style></head>
+<body><div class="fw-brand-strip"><a class="fw-hub-logo" href="./index.html" aria-label="Formwheel Hub로 이동"><span class="fw-hub-icon" aria-hidden="true"></span><span class="fw-hub-form">Form</span><span class="fw-hub-wheel">wheel</span></a></div><main>
+<a href="./">← Hub</a>
+<h1>🧪 플레이테스터 모집</h1>
+<p>Formwheel의 게임과 도구를 테스트하고 오류, 사용성, 아이디어를 알려주세요. 실명·연락처는 받지 않습니다.</p>
+<section class="challenge" aria-labelledby="find10-title">
+<h2 id="find10-title">⏱️ 10초 챌린지 · FIND IT!</h2>
+<p>처음 Formwheel에 온 사람처럼, <strong>게임 종류만 보고 10초 안에 원하는 프로젝트를 찾아보세요.</strong> 프로젝트는 무작위로 정해집니다.</p><p>🎯 <strong>진행 방법:</strong> 미션 설명을 읽고 Hub에서 검색창·키워드·필터·카드를 이용해 알맞은 프로젝트를 찾으세요. 정답이 여러 개인 미션은 어느 하나를 골라도 인정됩니다. 잘못 고르면 ❌가 표시되고 시간이 멈추며, Hub로 돌아오면 이어서 진행됩니다. 10초를 넘어도 계속 찾을 수 있지만 제한 시간 내에 찾아야 성공입니다.</p>
+<div class="compact-field"><label for="find10-age">연령대 (선택)</label><select id="find10-age"><option value="">응답하지 않음</option><option>10대 미만</option><option>10대</option><option>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대 이상</option></select><button type="button" class="secondary compact-clear" id="find10-age-clear">선택 취소</button></div>
+<div class="compact-field"><label for="find10-device">기기 종류 (선택)</label><select id="find10-device"><option value="">응답하지 않음</option><option>휴대폰</option><option>노트북</option><option>데스크톱 컴퓨터</option><option>기타</option></select></div>
+<label for="find10-notes">특이사항 (선택)</label><textarea id="find10-notes" maxlength="200" rows="1" placeholder="테스트 환경이나 참고사항 (개인정보 제외)"></textarea>
+<div id="find10-prepare" hidden>
+<p>당신이 찾아야 할 게임 종류</p>
+<div id="find10-target" aria-live="polite"></div>
+<p>원하는 홈을 선택하면 10초 카운트다운이 시작됩니다. 검색과 필터를 자유롭게 이용할 수 있어요.</p>
+<div class="find10-home-choices" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="find10-go-simple">⚡ 간편 홈에서 하기</button><button type="button" id="find10-go-card">🃏 카드 홈에서 하기</button></div>
+</div>
+<div id="find10-result" role="status" aria-live="polite" hidden></div>
+<p id="find10-send-status" role="status" aria-live="polite"></p><button type="button" class="secondary" id="find10-retry" hidden>결과 다시 전송</button>
+<button type="button" id="find10-random">🎲 랜덤 챌린지 뽑기</button>
+<small>선택 참여 · 계정 필요 없음 · 챌린지 완료 후 이 화면으로 돌아오면 결과가 운영자용 피드백 저장소에 전송됩니다. 닉네임 없이 목표·시간·성공 여부와 선택한 연령대·기기 종류·특이사항을 전송합니다. 전송 실패 시 다시 시도할 수 있습니다.</small>
+
+</section>
+
+<form id="apply">
+<label for="nickname">표시 이름 (실명 불필요)</label><input id="nickname" maxlength="24" required placeholder="닉네임">
+<div class="compact-field"><label for="apply-age">연령대 (선택)</label><select id="apply-age"><option value="">응답하지 않음</option><option>10대 미만</option><option>10대</option><option>20대</option><option>30대</option><option>40대</option><option>50대</option><option>60대 이상</option></select><button type="button" class="secondary compact-clear" id="apply-age-clear">선택 취소</button></div>
+<div class="compact-field"><label for="apply-device">기기 종류 (선택)</label><select id="apply-device"><option value="">응답하지 않음</option><option>휴대폰</option><option>노트북</option><option>데스크톱 컴퓨터</option><option>기타</option></select></div>
+<label for="field">테스트 분야</label><select id="field"><option>게임 플레이</option><option>모바일·UI</option><option>버그 찾기</option><option>접근성·튜토리얼</option></select>
+<label for="reason">지원 동기 (선택)</label><textarea id="reason" maxlength="300" rows="2"></textarea>
+<label for="apply-notes">특이사항 (선택)</label><textarea id="apply-notes" maxlength="300" rows="1" placeholder="테스트 환경, 참고사항 등 (실명·연락처 제외)"></textarea>
+<button id="submit">플레이테스터 지원서 제출하기</button>
+</form>
+<p id="status" role="status"></p>
+<small>지원서는 Firebase로 전송됩니다. 관리자 승인·배지·전용 테마·Rapid 혜택은 보안 권한 검증을 완료한 뒤 활성화됩니다.</small>
+<section><h2>📖 튜토리얼</h2><p>튜토리얼은 자동으로 시작되지 않습니다. 필요한 경우 아래 버튼으로 안내를 확인하세요.</p>
+<button type="button" id="tutorial" class="secondary">튜토리얼 보기</button>
+<div id="guide" hidden><p>① Hub에서 프로젝트를 고르세요.<br>② 카드의 설명과 난이도를 확인하세요.<br>③ 플레이 후 발견한 오류나 아이디어를 알려주세요.</p></div></section>
+<section id="find10-admin"><h2>📊 플레이테스트 결과 확인</h2><p>이 화면에서 목표별 성공률과 평균 탐색 시간을 확인할 수 있어요. Firebase 조회 권한이 필요합니다.</p><button type="button" id="find10-login">Google 로그인 후 통계 보기</button><button type="button" class="secondary" id="find10-reload" hidden>통계 새로고침</button><p id="find10-admin-status" role="status"></p><div id="find10-dashboard" hidden><strong id="find10-summary"></strong><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left"><thead><tr><th>프로젝트</th><th>시도</th><th>성공률</th><th>평균 시간</th><th>초과</th><th>헷갈린 프로젝트</th></tr></thead><tbody id="find10-stats"></tbody></table></div></div></section>
+<section id="tester-admin"><h2>🧪 플레이테스터 지원서 확인</h2><p>위 10초 챌린지 통계와 별도로 지원서를 조회합니다. 운영자 권한이 필요합니다.</p><button type="button" id="tester-review-open" class="secondary">📋 지원서 보기</button><p id="tester-review-status" role="status"></p><div id="tester-review-list"></div><small>승인·거절은 Google 로그인 후 Wiki 관리자 UID 등록과 Firebase Rules 검증이 통과할 때만 저장됩니다. 배지·테마·Rapid 혜택 지급은 아직 연동되지 않았습니다.</small></section>
+</main>
+<script type="text/plain" data-formlab-blocked="true">
+(()=>{
+'use strict';
+const KEY='fw-find10-challenge', RESULT='fw-find10-result';
+const choices=[
+{slug:'Battle',hint:'친구와 문제를 풀고 정답을 겨루는 퀴즈 대결을 하고 싶어요.'},
+{slug:'Cook',hint:'재료를 골라 요리를 만드는 게임'},
+{slug:'Reflex',hint:'반응 속도를 측정하는 게임'},
+{slug:'Spy',hint:'친구들과 숨어 있는 스파이를 찾는 추리 게임'},
+{slug:'Marble',hint:'구슬을 굴려 경주하는 게임'},
+{slug:'GCrown',hint:'왕관을 차지하는 전략 보드게임'},
+{slug:'DiceDuel',hint:'특수 효과가 있는 주사위 대결 게임'},
+{slug:'Clicker',hint:'클릭과 업그레이드로 성장하는 게임'},
+{slug:'Bomb',hint:'제한 시간과 폭탄을 이용하는 게임'},
+{slug:'Territory',hint:'땅을 점령하며 겨루는 전략 게임'},
+{slug:'Scribble',hint:'그림을 그리고 서로 맞히는 게임'},
+{slug:'Sports',hint:'축구나 농구를 즐기는 스포츠 게임'},
+{slug:'Wheel',answers:['Wheel','Form'],hint:'선택지를 넣고 돌려 무작위 결과를 뽑고 싶어요. 추첨이나 룰렛에 쓰는 기능을 찾아보세요.'},
+{slug:'Decode',hint:'문자와 코드를 여러 방식으로 변환하는 도구'},
+{slug:'Form',answers:['Form','Wheel'],hint:'선택 항목을 직접 구성하고 결과를 뽑는 나만의 돌림판을 만들고 싶어요.'},
+{slug:'Wiki',hint:'정보 문서를 읽고 편집을 제안하는 프로젝트'},
+{slug:'Quiz',hint:'문제를 풀거나 퀴즈를 만들 수 있는 프로젝트를 찾아보세요.'},
+{slug:'Piano',answers:['Piano','Music'],hint:'화면의 피아노 건반을 눌러 음을 연주하고 싶어요.'},
+{slug:'Music',hint:'음악을 연주하거나 리듬과 관련된 활동을 즐기고 싶어요.'},
+{slug:'Time',hint:'시간을 활용해 도전하는 게임'},
+{slug:'Button',hint:'버튼을 누르며 도전하는 게임'},
+{slug:'Balance',hint:'둘 중 하나를 고르는 밸런스 게임'},
+{slug:'Check',hint:'항목을 확인하는 도구'},
+{slug:'Maze',hint:'미로를 탐험하는 게임'},
+{slug:'Glitch',hint:'위험을 피하며 진행하는 게임'},
+{slug:'Board',answers:['Board','GCrown'],hint:'친구와 체스·바둑·오목·오델로처럼 규칙이 있는 보드게임을 하고 싶어요.'}
+];
+let selected=null;
+const $=id=>document.getElementById(id);
+$('find10-age-clear').onclick=()=>{$('find10-age').value=''};
+$('apply-age-clear').onclick=()=>{$('apply-age').value=''};
+$('find10-random').addEventListener('click',()=>{
+const previous=selected?.slug;
+const available=choices.filter(x=>x.slug!==previous);
+selected=available[Math.floor(Math.random()*available.length)];
+$('find10-target').textContent=selected.hint;
+$('find10-prepare').hidden=false;
+$('find10-result').hidden=true;
+$('find10-go-simple').focus();
+});
+function startFind10(homeMode){
+if(!selected)return;
+sessionStorage.setItem(KEY,JSON.stringify({slug:selected.slug,hint:selected.hint,answers:selected.answers||[selected.slug],ageGroup:$('find10-age').value,deviceType:$('find10-device').value,notes:$('find10-notes').value.trim().slice(0,200),startedAt:null,elapsedMs:0,homeMode:homeMode,mistakes:[]}));
+sessionStorage.removeItem(RESULT);
+try{localStorage.setItem('formwheel-hub-display-version',homeMode)}catch(e){}
+location.assign('./?fwFind10=1'+(homeMode==='card'?'#projects':''));
+}
+$('find10-go-simple').addEventListener('click',()=>startFind10('simple'));
+$('find10-go-card').addEventListener('click',()=>startFind10('card'));
+try{
+const raw=sessionStorage.getItem(RESULT);
+if(raw){
+const r=JSON.parse(raw);
+$('find10-result').hidden=false;
+$('find10-result').textContent=r.success
+?'✅ 성공! '+r.elapsed.toFixed(1)+'초 만에 올바른 프로젝트를 찾았어요.'
+:r.timeout?'⏰ 10초가 지났어요. Hub에서 원하는 프로젝트를 찾기 어려웠나요?'
+:r.elapsed>10?'⏱️ 목표: '+r.slug+' / 선택: '+(r.selectedSlug||'미기록')+' · '+r.elapsed.toFixed(1)+'초 후 선택했어요.' :'🔎 목표: '+r.slug+' / 선택: '+(r.selectedSlug||'미기록')+' · 다시 도전할 수 있어요.';
+if(!sessionStorage.getItem('fw-find10-delivered'))sessionStorage.setItem('fw-find10-pending',JSON.stringify(r));
+else {sessionStorage.removeItem('fw-find10-delivered');document.getElementById('find10-send-status').textContent='✅ 결과가 운영자에게 저장됐어요.';}
+sessionStorage.removeItem(RESULT);
+}
+}catch{}
+$('tutorial').onclick=()=>{$('guide').hidden=!$('guide').hidden};
+$('apply').onsubmit=async e=>{
+e.preventDefault();
+const status=$('status'),submit=$('submit'),v=id=>$(id).value.trim();
+const application={nickname:v('nickname').slice(0,24),ageGroup:v('apply-age'),deviceType:v('apply-device'),field:v('field'),reason:v('reason').slice(0,300),notes:v('apply-notes').slice(0,300)};
+submit.disabled=true;status.textContent='⏳ 지원서를 제출하고 있어요…';
+try{
+ const {submitTesterApplication}=await import('./assets/tester-applications.js?v=20261026-entitlement1');
+ await submitTesterApplication(application);
+ status.textContent='✅ 지원서가 접수됐어요! 관리자 검토를 기다려 주세요.';
+ $('apply').reset();
+}catch(err){status.textContent='⚠️ 제출 실패: '+(err.code||err.message||'네트워크/권한 오류')+' · 잠시 후 다시 시도해 주세요.'}
+finally{submit.disabled=false}
+};
+})();
+</script>
+<script type="text/plain" data-formlab-blocked="true" type="module" src="./assets/find10-submit.js?v=20261025-device"></script>
+<script type="text/plain" data-formlab-blocked="true" type="module" src="./assets/find10-admin.js?v=20261024-1"></script>
+<script type="text/plain" data-formlab-blocked="true" type="module" src="./assets/tester-applications.js?v=20261026-entitlement1"></script>
+<div style="position:fixed;inset:0;z-index:2147483647;background:#081523;color:#dff;padding:8vh 7vw;font:18px system-ui"><h1>🧪 FormLab 안전 대기 모드</h1><p>Formwheel 소스 복제 완료. 독립 Firebase 환경이 연결되기 전까지 실행을 차단합니다.</p><a style="color:#8ef" href="https://semicolonxss.github.io/Formwheel/beta-lab.html">BETA LAB 제어실</a></div></body></html>

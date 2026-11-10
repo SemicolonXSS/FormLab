@@ -1,0 +1,397 @@
+[
+  {
+    "project": "Formwheel",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_AI",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [
+          "formwheelAIUsers/"
+        ],
+        "databaseExpressions": []
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Balance",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "`balance/${roomId}/players/${playerId}`",
+          "`balance/${roomId}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Battle",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"battle/\"",
+          "\"quizzes\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Bomb",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/serverTimeOffset\"",
+          "\"bombRooms/\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Button",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [
+          "buttonRooms"
+        ],
+        "databaseExpressions": [
+          "`${root}/${room}/answers/${round}/${uid}`",
+          "`${root}/${room}/players/${uid}`",
+          "`${root}/${room}/roundData`",
+          "`${root}/${room}`",
+          "`${root}/${r}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Casino",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "'casinoV2/wallets/'"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Chat",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"chatCommands\"",
+          "\"chatRooms\"",
+          "\"chatUsers\"",
+          "`chatBans/${banTargetUid}`",
+          "`chatBans/${currentUser.uid}`",
+          "`chatCommands/${id}`",
+          "`chatOnline/${currentUser.uid}`",
+          "`chatRooms/${currentRoomId}`",
+          "`chatRooms/${roomId}/members`",
+          "`chatRooms/${roomId}`",
+          "`chatUsers/${currentUser.uid}`",
+          "`chatUsers/${result.user.uid}`",
+          "`roomCodes/${code}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Check",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/connected\"",
+          "\"formwheelChecklist\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Clicker",
+    "databaseSources": [
+      {
+        "file": "assets/app-2.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"clickerLeaderboard\"",
+          "\"clickerLeaderboard/\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Cook",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Decode",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_DiceDuel",
+    "databaseSources": [
+      {
+        "file": "assets/app-2.js",
+        "declaredRoots": [
+          "diceDuel"
+        ],
+        "databaseExpressions": []
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Edit",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Fate",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"fateRooms/\"",
+          "\"globalStats\"",
+          "\"globalStats/choiceCounts\"",
+          "\"leaderboard\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Form",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "'data'",
+          "'data/'"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_GCrown",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/connected\"",
+          "`gcrown/rooms/${code}`",
+          "`gcrown/rooms/${roomCode}`",
+          "`gcrown/rooms/${session.code}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Marble",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Music",
+    "databaseSources": [
+      {
+        "file": "modules/firebase-service.js",
+        "declaredRoots": [
+          "formwheelMusic"
+        ],
+        "databaseExpressions": [
+          "`${ROOT}/scores/${songId}`",
+          "`${ROOT}/songs`"
+        ]
+      },
+      {
+        "file": "modules/app.js",
+        "declaredRoots": [
+          "formwheelMusic"
+        ],
+        "databaseExpressions": []
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Piano",
+    "databaseSources": [
+      {
+        "file": "assets/app-2.js",
+        "declaredRoots": [
+          "pianoRooms"
+        ],
+        "databaseExpressions": [
+          "\".info/connected\"",
+          "`pianoRooms/${roomCode}/presence/${clientId}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Quiz",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "'data'",
+          "'data/'",
+          "'quizzes/'"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Reflex",
+    "databaseSources": [
+      {
+        "file": "modules/battle.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "'.info/connected'",
+          "'.info/serverTimeOffset'",
+          "`reflexRooms/${code}/presence/${uid}`",
+          "`reflexRooms/${code}`",
+          "`reflexRooms/${next}`",
+          "`reflexRooms/${old}/presence/${uid}`",
+          "`reflexRooms/${old}`",
+          "`reflexRooms/${saved}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Risk",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/serverTimeOffset\"",
+          "\"rooms/\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Spy",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/connected\"",
+          "\"spyRooms/\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Time",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\".info/serverTimeOffset\"",
+          "\"timeLeaderboard\"",
+          "`timeLeaderboard/${existingKey}`",
+          "`timeRooms/${room}/players/${playerId}`",
+          "`timeRooms/${room}/players`",
+          "`timeRooms/${room}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Tool",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Vault",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"vaultRooms/\"",
+          "`vaultRooms/${code}/players/${playerId}`",
+          "`vaultRooms/${roomCode}`"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Vote",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "\"vote/\""
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_Wheel",
+    "databaseSources": [],
+    "verifiedSecurityDeployment": false
+  },
+  {
+    "project": "Formwheel_WheelB",
+    "databaseSources": [
+      {
+        "file": "assets/app.js",
+        "declaredRoots": [],
+        "databaseExpressions": [
+          "'wheelBattle/'"
+        ]
+      }
+    ],
+    "verifiedSecurityDeployment": false
+  }
+]
