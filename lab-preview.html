@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>FormLab 실험 미리보기</title>
+<style>
+:root{color-scheme:dark}body{margin:0;padding:1rem;background:#101d2b;color:#e5f8fb;font:16px system-ui}
+h1{font-size:1.25rem}h2{font-size:1rem}article{border:1px solid #527080;border-radius:.75rem;padding:.8rem;margin:.7rem 0}
+button{color:#10242d;background:#9aeee2;border:0;border-radius:.4rem;padding:.5rem .8rem;font:inherit}
+output{display:block;margin-top:.5rem;white-space:pre-wrap}a{color:#9aeee2}
+</style>
+<main>
+<h1>FormLab 실험 미리보기</h1>
+<p id="empty">BETA LAB에서 스위치를 켜면 이곳에 체험용 모듈이 표시돼요.</p>
+<section id="modules" aria-label="활성 실험"></section>
+</main>
+<script>
+'use strict';
+const modules = {
+  'hub-next-3': ['HUB NEXT 3.0', '다음 추천 카드', ['🎮 Maze', '🎨 Paint', '🧰 FW12']],
+  'fw12-experimental': ['FW12 EXPERIMENTAL', '예제 로그 분석', ['permission_denied → 쓰기 경로와 계정 권한 확인', 'SyntaxError → 파일 경로와 오류 줄 확인']],
+  'smart-login': ['SMART LOGIN', '예제 세션 전환', ['로그인 복원 중…', '예제 세션 복원 완료', '게스트로 전환']],
+  'live-analytics': ['LIVE ANALYTICS', '예제 집계 추가', ['접속자 1명', '접속자 2명', '접속자 3명']],
+  'theme-engine': ['THEME ENGINE', '미리보기 색 변경', ['Echo', 'Nova', 'Void']],
+  'seren-ai': ['SEREN AI', '예제 아이디어 뽑기', ['미로에서 시간 제한 없이 길 찾기', '그림 도구에서 두 색으로만 그리기', '반응속도 기록 3번 비교하기']],
+  'rapid-next': ['RAPID NEXT', '모의 거래', ['모의 잔액 e90', '모의 잔액 e80', '모의 잔액 e70']],
+  'secret-lab': ['SECRET LAB', '예제 암호 해독', ['IRUPZKHHO', 'ROT-3 → FORMWHEEL']]
+};
+const root = document.getElementById('modules');
+const active = new Map();
+function addModule(id) {
+  const [name, action, samples] = modules[id];
+  const card = document.createElement('article');
+  const heading = document.createElement('h2');
+  const button = document.createElement('button');
+  const output = document.createElement('output');
+  let step = 0;
+  heading.textContent = name;
+  button.textContent = action;
+  button.type = 'button';
+  output.setAttribute('aria-live', 'polite');
+  button.addEventListener('click', () => {
+    const index = step++ % samples.length;
+    output.textContent = samples[index];
+    if (id === 'theme-engine') card.style.backgroundColor = ['#263e58', '#513369', '#242334'][index];
+  });
+  card.append(heading, button, output);
+  root.append(card);
+  active.set(id, card);
+}
+window.addEventListener('message', event => {
+  if (event.source !== window.parent || event.origin !== 'https://semicolonxss.github.io' ||
+      event.data?.type !== 'formwheel-beta-preview' || !Array.isArray(event.data.enabled)) return;
+  const enabled = new Set(event.data.enabled);
+  for (const id of Object.keys(modules)) {
+    if (enabled.has(id) && !active.has(id)) addModule(id);
+    if (!enabled.has(id) && active.has(id)) {
+      active.get(id).remove();
+      active.delete(id);
+    }
+  }
+  document.getElementById('empty').hidden = active.size > 0;
+});
+</script>
+</html>
