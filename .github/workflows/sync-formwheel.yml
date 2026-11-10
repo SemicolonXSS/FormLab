@@ -17,7 +17,7 @@ jobs:
           rsync -a --exclude='.git' --exclude='.github' --exclude='firebase-security' --exclude='.env' --exclude='.env.*' /tmp/formwheel-upstream/ /tmp/formlab-snapshot/
       - name: Copy source while preserving lab controls
         run: |
-          rsync -a --delete --exclude='.git' --exclude='.github' --exclude='README.md' --exclude='FORMLAB-SAFETY.md' --exclude='formlab-bootstrap.js' --exclude='lab-preview.html' /tmp/formlab-snapshot/ ./
+          rsync -a --delete --exclude='.git' --exclude='.github' --exclude='README.md' --exclude='FORMLAB-SAFETY.md' --exclude='formlab-bootstrap.js' --exclude='lab-preview.html' --exclude='index.html' /tmp/formlab-snapshot/ ./
           python3 - <<'PY'
           from pathlib import Path
           # A lab copy must not accidentally access production Firebase.
